@@ -33,7 +33,7 @@ repos:
       - id: mdformat
         files: ^(README|CLAUDE|SECURITY)\.md$|^docs/.*\.md$
         additional_dependencies:
-          - "mdformat-mkdocs[recommended]>=5.1"
+          - "mdformat-mkdocs[recommended]>=5.3.0"
 
   - repo: https://github.com/astral-sh/uv-pre-commit
     rev: 0.12.23
