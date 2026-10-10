@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel superseded pull request runs; let main runs finish so images are always published.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions: {}
+
+env:
+  UV_VERSION: "0.12.23"
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  quality:
+    name: Hooks and dependency audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.13"
+      - run: uv sync --frozen
+      - name: Run all prek hooks
+        run: uv run prek run --all-files --show-diff-on-failure
+      - name: Audit locked dependencies
+        run: uv run poe audit
+
+  test:
+    name: Test (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ matrix.python }}
+      - run: uv sync --frozen
+      - run: uv run poe test
+
+  container:
+    name: Container build, conformance and publish
+    needs: [quality, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # used only on main, to publish the image this job tested
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          load: true
+          tags: store:test
+      - name: Start container and wait for health
+        run: |
+          docker run -d --name store -p 8000:8000 \
+            -e DJANGO_SECRET_KEY=ci-only-not-secret \
+            -e ISCC_C2PA_STORE_URL=http://127.0.0.1:8000 \
+            store:test
+          for _ in $(seq 1 30); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' store)" = healthy ] && break
+            sleep 2
+          done
+          docker inspect -f '{{.State.Health.Status}}' store | grep -qx healthy
+          [ "$(docker exec store id -u)" = 10001 ]
+          for path in / /docs /openapi/openapi.json /static/site.css /v1/services/status /.well-known/c2pa-soft-binding-resolution /admin/login/; do
+            curl -sf -H "Accept: text/html" "http://127.0.0.1:8000$path" > /dev/null || { echo "::error::$path"; exit 1; }
+          done
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: C2PA Soft Binding API conformance harness
+        run: bash scripts/conformance.sh http://127.0.0.1:8000/v1
+      - name: Container logs
+        if: always()
+        run: docker logs store
+      - name: Log in to the GitHub container registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish the tested image as main and sha-<commit>
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          for tag in main "sha-$GITHUB_SHA"; do
+            docker tag store:test "$IMAGE:$tag"
+            docker push "$IMAGE:$tag"
+          done

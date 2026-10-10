@@ -1,0 +1,9 @@
+# Allowlist: only the build inputs enter the image context.
+**
+!pyproject.toml
+!uv.lock
+!README.md
+!manage.py
+!docker/
+!iscc_c2pa_store/
+**/__pycache__
