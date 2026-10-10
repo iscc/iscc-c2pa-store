@@ -1,0 +1,124 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ISCC C2PA Store - API reference</title>
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="{% static 'brand/favicon.svg' %}" type="image/svg+xml">
+  <link rel="icon" href="{% static 'brand/favicon.ico' %}" sizes="48x48">
+  <link rel="stylesheet" href="{% static 'brand/tokens/iscc.css' %}">
+  <link rel="stylesheet" href="{% static 'vendor/stoplight-elements-9.0.27/styles.min.css' %}">
+  <script src="{% static 'vendor/stoplight-elements-9.0.27/web-components.min.js' %}"></script>
+  <style>
+    /* ISCC chrome around Stoplight Elements: a near-black bar with the unit colours on top, the reference below
+       filling the rest of the viewport. Stoplight Elements renders in light colours only, so the page stays light. */
+    :root {
+      --font-ui: var(--iscc-font-body);
+      --font-prose: var(--iscc-font-body);
+      --font-code: var(--iscc-font-detail);
+      --color-primary: var(--iscc-blue);
+      color-scheme: light;
+    }
+    html,
+    body {
+      height: 100%;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      margin: 0;
+      background: var(--iscc-white);
+    }
+    .top {
+      flex: none;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--iscc-space-8) var(--iscc-space-24);
+      min-height: 56px;
+      padding: 0 var(--iscc-space-24);
+      border-top: 4px solid transparent;
+      border-image: linear-gradient(90deg,
+        var(--iscc-unit-meta) 0 20%, var(--iscc-unit-semantic) 20% 40%, var(--iscc-unit-content) 40% 60%,
+        var(--iscc-unit-data) 60% 80%, var(--iscc-unit-instance) 80% 100%) 1;
+      background: var(--iscc-ink);
+      color: var(--iscc-paper);
+      font: 400 var(--iscc-type-small) / var(--iscc-leading-small) var(--iscc-font-body);
+    }
+    .top img {
+      display: block;
+      width: 84px;
+      height: auto;
+    }
+    .top__label {
+      color: #A9B0B6;
+      font: 400 var(--iscc-type-label) / var(--iscc-leading-label) var(--iscc-font-detail);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .top nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--iscc-space-8) var(--iscc-space-24);
+      margin-left: auto;
+    }
+    .top a {
+      color: var(--iscc-paper);
+      text-decoration: none;
+    }
+    .top a:hover {
+      color: var(--iscc-cyan);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .top a:focus-visible {
+      outline: 2px solid var(--iscc-coral);
+      outline-offset: 2px;
+    }
+    .api {
+      position: relative;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    elements-api {
+      display: block;
+      height: 100%;
+    }
+    .sl-elements pre {
+      overflow-x: auto;
+    }
+    @media (max-width: 640px) {
+      .top {
+        padding: var(--iscc-space-8) var(--iscc-space-16);
+      }
+      .top nav {
+        margin-left: 0;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <a href="{% url 'index' %}" aria-label="ISCC C2PA Store home">
+      <img src="{% static 'brand/logos/iscc-logo-white-coral.svg' %}" alt="" width="84" height="23">
+    </a>
+    <span class="top__label">C2PA Store · API reference · v{{ version }}</span>
+    <nav aria-label="Site">
+      <a href="{% url 'index' %}">Home</a>
+      <a href="{% url 'openapi' 'openapi.yaml' %}">OpenAPI</a>
+      <a href="https://github.com/iscc/iscc-c2pa-store">GitHub</a>
+    </nav>
+  </header>
+  <main class="api">
+    <elements-api
+      apiDescriptionUrl="{% url 'openapi' 'openapi.json' %}"
+      router="hash"
+      layout="sidebar"
+      hideExport="true"
+      logo="{% static 'brand/favicon.svg' %}"
+    ></elements-api>
+  </main>
+</body>
+</html>

@@ -1,0 +1,53 @@
+{% extends "admin/base_site.html" %}
+{% load l10n static unfold %}
+
+{% comment %}
+Confirmation page of the delete action of ManifestAdmin: posts the selection back with post=yes.
+{% endcomment %}
+
+{% block extrahead %}
+    {{ block.super }}
+    {{ media }}
+    <script src="{% static 'admin/js/cancel.js' %}" async></script>
+{% endblock %}
+
+{% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} delete-confirmation delete-selected-confirmation{% endblock %}
+
+{% block content %}
+    <div class="border border-base-200 rounded-default shadow-xs dark:border-base-800">
+        <div class="flex flex-col gap-2 p-4">
+            <p class="font-semibold text-font-important-light dark:text-font-important-dark">
+                Delete {{ queryset|length }} manifest(s)?
+            </p>
+            <p class="leading-relaxed">
+                Their bytes and soft bindings are removed and their addresses answer 410 Gone from now on. Declared
+                ISCCs are withdrawn from the hub. This cannot be undone.
+            </p>
+        </div>
+
+        <ul class="border-t border-base-200 flex flex-col gap-2 leading-relaxed p-4 dark:border-base-800">
+            {% for record in queryset %}
+                <li class="flex flex-row flex-wrap gap-2 items-center">
+                    <span class="font-medium text-important">{{ record.title|default:record.manifest_id }}</span>
+                    <span class="text-subtle text-xs">{{ record.manifest_id }}</span>
+                    {% include "unfold/helpers/label.html" with type=status_labels|index:record.declaration.status text=record.declaration.status %}
+                </li>
+            {% endfor %}
+        </ul>
+
+        <form method="post" class="border-t border-base-200 px-4 py-3 dark:border-base-800">
+            {% csrf_token %}
+
+            {% for record in queryset %}
+                <input type="hidden" name="{{ action_checkbox_name }}" value="{{ record.pk|unlocalize }}">
+            {% endfor %}
+
+            <input type="hidden" name="action" value="delete_manifests">
+            <input type="hidden" name="post" value="yes">
+
+            <div class="flex items-center">
+                {% include "unfold/helpers/delete_submit_line.html" %}
+            </div>
+        </form>
+    </div>
+{% endblock %}

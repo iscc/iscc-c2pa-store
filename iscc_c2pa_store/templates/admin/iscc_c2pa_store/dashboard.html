@@ -1,0 +1,123 @@
+{% extends "admin/index.html" %}
+{% load admin_urls unfold %}
+
+{% comment %}
+Operator dashboard: the admin index of the store (admin.site.index_template). Its data comes from
+iscc_c2pa_store.admin.dashboard (UNFOLD["DASHBOARD_CALLBACK"]). Only Tailwind classes compiled into unfold's
+styles.css take effect here.
+{% endcomment %}
+
+{% block content %}
+<div class="flex flex-col gap-8">
+    <div class="grid gap-6 md:grid-cols-3">
+        {% for card in manifest_cards %}
+            {% component "unfold/components/card.html" with href=card.href icon=card.icon %}
+                {% component "unfold/components/text.html" %}{{ card.title }}{% endcomponent %}
+                {% component "unfold/components/title.html" %}{{ card.value }}{% endcomponent %}
+                <p class="text-subtle text-xs">{{ card.description }}</p>
+            {% endcomponent %}
+        {% endfor %}
+    </div>
+
+    <div class="flex flex-col gap-3">
+        <div class="flex flex-row flex-wrap gap-2 items-center">
+            <h2 class="font-semibold text-important">Declarations</h2>
+            <p class="text-subtle text-xs ml-auto">
+                {% if declares %}
+                    Declaring to {{ hub_url }} as {{ controller }}
+                {% else %}
+                    Declarations are disabled: the store has no declaration key or hub
+                {% endif %}
+            </p>
+        </div>
+        <div class="grid gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+            {% for card in declaration_cards %}
+                {% component "unfold/components/card.html" with href=card.href size="md" %}
+                    <div class="flex flex-col gap-2">
+                        {# href="" keeps the label a span: a link inside the linked card would break the markup #}
+                        <div>{% include "unfold/helpers/label.html" with type=card.variant text=card.status href="" %}</div>
+                        <div class="flex flex-row gap-2 items-center">
+                            {% component "unfold/components/title.html" with class=card.tone %}{{ card.count }}{% endcomponent %}
+                            {% if card.tone %}
+                                <span class="material-symbols-outlined {{ card.tone }}" title="Needs attention">warning</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endcomponent %}
+            {% endfor %}
+        </div>
+    </div>
+
+    {% component "unfold/components/card.html" with title="Soft bindings by algorithm" %}
+        {% if binding_rows %}
+            <div class="flex flex-col gap-4">
+                {% for row in binding_rows %}
+                    <div class="flex flex-col gap-1">
+                        <div class="flex flex-row flex-wrap gap-2 items-center">
+                            <a href="{{ row.href }}" class="font-medium text-primary-600">{{ row.alg }}</a>
+                            {% if row.kind %}<span class="text-subtle text-xs">{{ row.kind }}</span>{% endif %}
+                            <span class="ml-auto font-semibold text-important">{{ row.count }}</span>
+                        </div>
+                        {% component "unfold/components/progress.html" with value=row.share %}{% endcomponent %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-subtle">No soft bindings stored yet</p>
+        {% endif %}
+    {% endcomponent %}
+
+    <div class="grid gap-6 lg:grid-cols-2">
+        {% capture as uploads_footer silent %}
+            <a href="{{ manifests_url }}" class="text-primary-600 text-sm">All manifests</a>
+        {% endcapture %}
+        {% component "unfold/components/card.html" with title="Latest uploads" footer=uploads_footer %}
+            {% if latest_manifests %}
+                <div class="flex flex-col -my-2">
+                    {% for record in latest_manifests %}
+                        <div class="border-t border-base-200 first:border-t-0 flex flex-row flex-wrap gap-2 items-center py-2 dark:border-base-800">
+                            <div class="flex flex-col min-w-0 grow">
+                                <a href="{% url 'admin:iscc_c2pa_store_manifest_change' record.pk|admin_urlquote %}" class="font-medium text-primary-600 truncate">{{ record.title|default:record.manifest_id }}</a>
+                                <span class="text-subtle text-xs truncate">{{ record.signer|default:"unknown signer" }} · {{ record.uploaded_at|date:"Y-m-d H:i" }} · {{ record.size|filesizeformat }}</span>
+                            </div>
+                            {% if record.deleted_at %}
+                                {% include "unfold/helpers/label.html" with type="danger" text="deleted" %}
+                            {% elif record.trusted %}
+                                {% include "unfold/helpers/label.html" with type="success" text="trusted" %}
+                            {% endif %}
+                            {% include "unfold/helpers/label.html" with type=status_labels|index:record.declaration.status text=record.declaration.status %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-subtle">No uploads yet</p>
+            {% endif %}
+        {% endcomponent %}
+
+        {% capture as attention_footer silent %}
+            <a href="{{ attention_url }}" class="text-primary-600 text-sm">All {{ attention_count }} declaration(s) that need attention</a>
+        {% endcapture %}
+        {% component "unfold/components/card.html" with title="Needs attention" footer=attention_footer %}
+            {% if attention %}
+                <div class="flex flex-col -my-2">
+                    {% for declaration in attention %}
+                        <div class="border-t border-base-200 first:border-t-0 flex flex-row flex-wrap gap-2 items-center py-2 dark:border-base-800">
+                            <div class="flex flex-col min-w-0 grow">
+                                <a href="{% url 'admin:iscc_c2pa_store_declaration_change' declaration.pk|admin_urlquote %}" class="font-medium text-primary-600 truncate">{{ declaration.manifest.title|default:declaration.manifest_id }}</a>
+                                <span class="text-subtle text-xs truncate">{{ declaration.attempts }} attempt(s) · {{ declaration.updated_at|date:"Y-m-d H:i" }}{% if declaration.last_error %} · {{ declaration.last_error|truncatechars:80 }}{% endif %}</span>
+                            </div>
+                            {% if declaration.manifest.deleted_at %}
+                                {% include "unfold/helpers/label.html" with type="danger" text="withdrawal due" %}
+                            {% else %}
+                                {% include "unfold/helpers/label.html" with type=status_labels|index:declaration.status text=declaration.status %}
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-subtle">All declarations are in order</p>
+            {% endif %}
+        {% endcomponent %}
+    </div>
+</div>
+{% endblock %}

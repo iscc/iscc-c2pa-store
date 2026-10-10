@@ -1,0 +1,451 @@
+openapi: 3.1.1
+info:
+  title: ISCC C2PA Store
+  version: 0.1.0
+  summary: C2PA Manifest Repository with a Soft Binding Resolution API and ISCC declarations
+  description: |
+    Stores C2PA Manifest Stores and finds them again by soft binding. Upload a Manifest Store; the store checks it
+    with c2pa-rs, indexes every soft binding of its active manifest by algorithm, serves it unchanged at its
+    manifest address, and declares its `io.iscc.v0` soft binding on the ISCC Discovery Protocol with that address as
+    gateway URL, so that anyone who finds the content through the ISCC network finds the manifest.
+
+    Implements the store, fetch, query and service routes of the C2PA Soft Binding Resolution API as defined for
+    the upcoming C2PA specification 2.5, whose OpenAPI document still carries version 2.4.0. Schemas named `c2pa.*`
+    are copied verbatim from the C2PA OpenAPI document (`c2pa-sbr.json`, CC BY 4.0).
+
+    Reads and uploads are open, limited per client address; deletes need the operator token of the deployment.
+
+    **Experimental (beta, MVP).** This service and its documentation are provided as is, without warranty of any kind. The API, the declaration behaviour and the public instances may change in breaking ways before version 1.0.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+externalDocs:
+  description: Source and documentation
+  url: https://github.com/iscc/iscc-c2pa-store
+tags:
+  - name: store
+    description: Add and remove C2PA Manifest Stores
+  - name: fetch
+    description: Retrieve C2PA Manifest Stores
+  - name: query
+    description: Find C2PA Manifests by soft binding
+  - name: service
+    description: Service discovery, capabilities and status
+  - name: identity
+    description: The store's own identity as an ISCC declarer
+paths:
+  /v1/manifests:
+    post:
+      tags: [store]
+      summary: Add a C2PA Manifest Store to the repository
+      description: |
+        The body is a C2PA Manifest Store. It is accepted when c2pa-rs reads it and the claim signature of its active
+        manifest verifies; hard-binding failures (the asset is not uploaded) and signing credentials outside the C2PA
+        trust list are recorded, not refused. Uploading the same bytes again returns the same result. A manifest ID
+        that is already taken by other bytes, or was deleted, is refused with 409.
+
+        When the active manifest carries an `io.iscc.v0` soft binding with a 256-bit Data-Code and Instance-Code, the
+        store declares it on the ISCC Discovery Protocol under its own key, with `manifestUrl` as gateway URL, unless
+        `declare=false`.
+      operationId: addManifest
+      parameters:
+        - name: returnReceipt
+          in: query
+          description: Accepted and ignored; this repository does not issue receipts yet.
+          schema:
+            type: boolean
+            default: false
+        - name: declare
+          in: query
+          description: |
+            Extension. Whether the store declares the manifest's `io.iscc.v0` soft binding on the ISCC Discovery
+            Protocol. Uploaders that declare it themselves send `false` and use `manifestUrl` as their gateway URL.
+            Defaults to the deployment setting (`true` on the public instances).
+          schema:
+            type: boolean
+      requestBody:
+        required: true
+        description: C2PA Manifest Store
+        content:
+          application/c2pa:
+            schema:
+              type: string
+              contentMediaType: application/c2pa
+      responses:
+        "200":
+          description: The C2PA Manifest Store is stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreResult"
+        "400":
+          $ref: "#/components/responses/InvalidManifest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          $ref: "#/components/responses/TooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/ServiceFailure"
+  /v1/manifests/{activeManifestId}:
+    get:
+      tags: [fetch]
+      summary: Return a stored C2PA Manifest Store
+      description: Returns the Manifest Store byte for byte as it was uploaded.
+      operationId: getManifestById
+      parameters:
+        - $ref: "#/components/parameters/activeManifestId"
+        - name: returnActiveManifest
+          in: query
+          description: Accepted and ignored; the full Manifest Store is always returned.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: The C2PA Manifest Store
+          content:
+            application/c2pa: {}
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/ManifestNotFound"
+        "410":
+          $ref: "#/components/responses/ManifestDeleted"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      tags: [store]
+      summary: Remove a C2PA Manifest Store from the repository
+      description: |
+        Deletes the bytes and the soft bindings of the manifest, and withdraws its declaration from the ISCC
+        Discovery Protocol when the store made it. The manifest address then answers 410. Requires the operator token.
+      operationId: deleteManifest
+      security:
+        - operator: []
+      parameters:
+        - $ref: "#/components/parameters/activeManifestId"
+      responses:
+        "204":
+          description: The C2PA Manifest Store is deleted
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/ManifestNotFound"
+        "410":
+          $ref: "#/components/responses/ManifestDeleted"
+  /v1/matches/byBinding:
+    get:
+      tags: [query]
+      summary: Find stored C2PA Manifests by soft binding
+      description: |
+        Exact match of the binding value for every indexed algorithm. For `io.iscc.v0` also by similarity: 100 for an
+        equal Instance-Code, otherwise the best Semantic-, Content- or Data-Code similarity, at most 99. Matches are
+        stored in this repository, so they carry no `endpoint`.
+      operationId: queryByBinding
+      parameters:
+        - name: alg
+          in: query
+          required: true
+          description: Soft binding algorithm from the C2PA Soft Binding Algorithm List
+          schema:
+            type: string
+            maxLength: 255
+            examples: [io.iscc.v0]
+        - name: value
+          in: query
+          required: true
+          description: Base64 soft binding value, percent-encoded; for `io.iscc.v0` an ISCC-SEQ (IEP-0020)
+          schema:
+            type: string
+            maxLength: 4096
+        - $ref: "#/components/parameters/maxResults"
+      responses:
+        "200":
+          $ref: "#/components/responses/QueryResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    post:
+      tags: [query]
+      summary: Find stored C2PA Manifests by a soft binding sent as JSON
+      operationId: queryByLargeBinding
+      parameters:
+        - $ref: "#/components/parameters/maxResults"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "c2pa-sbr.json#/components/schemas/c2pa.softBindingQuery"
+      responses:
+        "200":
+          $ref: "#/components/responses/QueryResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "413":
+          $ref: "#/components/responses/TooLarge"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /v1/services/supportedAlgorithms:
+    get:
+      tags: [service]
+      summary: List the soft binding algorithms this repository indexes
+      operationId: getSupportedBindings
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "c2pa-sbr.json#/components/schemas/c2pa.softBindingAlgList"
+  /v1/services/status:
+    get:
+      tags: [service]
+      summary: Report the operational status; degraded while a manifest uploaded over 15 minutes ago awaits its declaration
+      operationId: getServiceStatus
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "c2pa-sbr.json#/components/schemas/c2pa.serviceStatus"
+  /v1/services/capabilities:
+    get:
+      tags: [service]
+      summary: Report the implemented specification version and optional capabilities
+      operationId: getServiceCapabilities
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "c2pa-sbr.json#/components/schemas/c2pa.serviceCapabilities"
+  /.well-known/c2pa-soft-binding-resolution:
+    get:
+      tags: [service]
+      summary: Discovery information for this soft binding resolution service
+      operationId: getWellKnown
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "c2pa-sbr.json#/components/schemas/c2pa.wellKnownDiscovery"
+  /.well-known/did.json:
+    get:
+      tags: [identity]
+      summary: The did:web document of the key that signs this store's ISCC declarations
+      operationId: getDidDocument
+      responses:
+        "200":
+          description: DID document with the store's Ed25519 public key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DidDocument"
+        "404":
+          description: This deployment does not declare and has no key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+components:
+  securitySchemes:
+    operator:
+      type: http
+      scheme: bearer
+      description: The operator token of this deployment
+  parameters:
+    activeManifestId:
+      name: activeManifestId
+      in: path
+      required: true
+      description: Identifier of the active C2PA Manifest, percent-encoded
+      schema:
+        type: string
+        maxLength: 255
+        examples: ["urn:c2pa:F9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4"]
+    maxResults:
+      name: maxResults
+      in: query
+      description: Maximum number of matches to return; values above 100 are capped at 100.
+      schema:
+        type: integer
+        minimum: 1
+        default: 10
+  responses:
+    QueryResult:
+      description: Matches, best first
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/QueryResult"
+    BadRequest:
+      description: Invalid parameter or query value
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InvalidManifest:
+      description: The body is not an acceptable C2PA Manifest Store; `code` names the first failure
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Missing or wrong operator token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ManifestNotFound:
+      description: C2PA Manifest not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ManifestDeleted:
+      description: The C2PA Manifest Store was deleted
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: The manifest ID is taken by a different Manifest Store, or was deleted
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    TooLarge:
+      description: The request body exceeds the upload limit of this deployment
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    UnsupportedMediaType:
+      description: The body is not sent as application/c2pa
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    TooManyRequests:
+      description: Rate limit of this client address exceeded; see `Retry-After`
+      headers:
+        Retry-After:
+          description: Seconds to wait before the next request
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ServiceFailure:
+      description: Service failure
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    StoreResult:
+      description: Result of storing a Manifest Store (c2pa.manifestCreateResult with extension fields)
+      allOf:
+        - $ref: "c2pa-sbr.json#/components/schemas/c2pa.manifestCreateResultIdOnly"
+        - type: object
+          required: [manifestUrl, declaration]
+          properties:
+            manifestUrl:
+              type: string
+              description: Extension. The manifest address on this repository, usable as ISCC gateway URL.
+              examples: ["https://c2pa-store-test.iscc.io/v1/manifests/urn%3Ac2pa%3AF9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4"]
+            declaration:
+              $ref: "#/components/schemas/Declaration"
+    Declaration:
+      description: Extension. Where the store's ISCC declaration of this manifest stands.
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [declared, pending, failed, skipped, disabled, withdrawn]
+          description: |
+            `declared`: on the hub, with `isccId`. `pending`: the hub was unavailable; the store retries.
+            `failed`: the hub refused it. `skipped`: no `io.iscc.v0` binding with a 256-bit Data-Code and
+            Instance-Code, or `declare=false`. `disabled`: this deployment does not declare. `withdrawn`: removed.
+        isccId:
+          type: string
+          pattern: "^ISCC:[A-Z2-7]{16}$"
+          description: ISCC-ID of the declaration
+          examples: ["ISCC:MAIGKV5FAAXOXYAB"]
+        hub:
+          type: string
+          description: The ISCC hub that holds the declaration
+          examples: ["https://staging.iscc.id"]
+    QueryResult:
+      description: Result of a soft binding query (c2pa.softBindingQueryResult with extension fields)
+      type: object
+      required: [matches]
+      properties:
+        matches:
+          type: array
+          items:
+            $ref: "#/components/schemas/Match"
+    Match:
+      description: A C2PA Manifest stored in this repository; fetch it from GET /v1/manifests/{manifestId}.
+      allOf:
+        - $ref: "c2pa-sbr.json#/components/schemas/c2pa.softBindingQueryResult/properties/matches/items"
+        - type: object
+          required: [similarityScore]
+          properties:
+            similarityScore:
+              type: integer
+              minimum: 0
+              maximum: 100
+              description: 100 for an exact match or an equal Instance-Code, otherwise the best unit similarity
+            isccId:
+              type: string
+              pattern: "^ISCC:[A-Z2-7]{16}$"
+              description: Extension. ISCC-ID of the store's declaration of this manifest, when it has one.
+              examples: ["ISCC:MAIGKV5FAAXOXYAB"]
+    DidDocument:
+      description: W3C DID document (did:web) with the Ed25519 verification method of the store's declaration key
+      type: object
+      required: [id, verificationMethod]
+      properties:
+        id:
+          type: string
+          examples: ["did:web:c2pa-store-test.iscc.io"]
+        verificationMethod:
+          type: array
+          items:
+            type: object
+            required: [id, type, controller, publicKeyMultibase]
+            properties:
+              id:
+                type: string
+              type:
+                type: string
+              controller:
+                type: string
+              publicKeyMultibase:
+                type: string
+    Error:
+      description: Error response
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
+          description: What went wrong
+        code:
+          type: string
+          description: For refused Manifest Stores, the C2PA validation status code (or `manifest.*`) of the first failure

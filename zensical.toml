@@ -1,0 +1,53 @@
+[project]
+site_name = "ISCC C2PA Store"
+site_description = "C2PA Manifest Repository with a Soft Binding Resolution API that declares ISCC soft bindings on the ISCC Discovery Protocol"
+site_author = "Titusz Pan"
+site_url = "https://c2pa-store.iscc.codes/"
+repo_url = "https://github.com/iscc/iscc-c2pa-store"
+repo_name = "iscc/iscc-c2pa-store"
+edit_uri = "edit/main/docs/"
+copyright = "<a href=\"https://iscc.io/foundation\">ISCC Foundation</a> | Documentation licensed under <a href=\"https://creativecommons.org/licenses/by/4.0/\">CC BY 4.0</a> | Copyright &copy; 2026 The Authors | <a href=\"https://iscc.io/privacy\">Privacy Policy</a> | <a href=\"https://iscc.io/imprint\">Imprint</a>"
+
+nav = [
+    { "Home" = "index.md" },
+    { "How it works" = "how-it-works.md" },
+    { "API reference" = "api.md" },
+    { "Declarations" = "declarations.md" },
+    { "Operations" = "operations.md" },
+    { "Conformance" = "conformance.md" },
+    { "Development" = "development.md" },
+]
+
+# Options of the ISCC theme (zensical-iscc)
+[project.extra.iscc]
+tagline = "C2PA manifests, findable by content"
+copy_page = true
+chat = false
+
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/iscc/iscc-c2pa-store"
+
+# Fonts, palette, logo, favicon and widgets come from the zensical-iscc package (docs dependency group).
+[project.theme]
+name = "zensical_iscc"
+
+[project.markdown_extensions]
+abbr = {}
+admonition = {}
+attr_list = {}
+def_list = {}
+md_in_html = {}
+
+[project.markdown_extensions.toc]
+permalink = true
+
+[project.markdown_extensions.pymdownx]
+details = {}
+
+[project.markdown_extensions.pymdownx.highlight]
+anchor_linenums = true
+line_spans = "__span"
+pygments_lang_class = true
+
+[project.markdown_extensions.pymdownx.superfences]

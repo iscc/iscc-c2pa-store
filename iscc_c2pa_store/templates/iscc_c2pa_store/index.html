@@ -1,0 +1,396 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ISCC C2PA Store - C2PA Manifest Repository with ISCC soft bindings</title>
+  <meta name="description" content="C2PA Manifest Repository: stores C2PA Manifest Stores, serves them at stable manifest addresses, finds them by soft binding and declares their ISCC on the ISCC Discovery Protocol.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F8F9FA" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#212529" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="{% static 'brand/favicon.svg' %}" type="image/svg+xml">
+  <link rel="icon" href="{% static 'brand/favicon.ico' %}" sizes="48x48">
+  <link rel="preload" href="{% static 'brand/fonts/readex-pro-300.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{% static 'brand/tokens/iscc.css' %}">
+  <link rel="stylesheet" href="{% static 'site.css' %}">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="bar">
+    <a class="logo" href="https://iscc.io" aria-label="ISCC home">
+      <picture>
+        <source srcset="{% static 'brand/logos/iscc-logo-white-coral.svg' %}" media="(prefers-color-scheme: dark)">
+        <img src="{% static 'brand/logos/iscc-logo-black-coral.svg' %}" alt="" width="120" height="33">
+      </picture>
+    </a>
+    <span class="label">C2PA Store</span>
+    <nav class="nav" aria-label="Page">
+      <a href="#how">How it works</a>
+      <a href="#use">Use it</a>
+      <a href="#numbers">Numbers</a>
+      <a href="#instance">This instance</a>
+      <a class="btn btn--small" href="{% url 'docs' %}">API reference</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero" aria-labelledby="hero-title">
+      <div>
+        <p class="label">C2PA Manifest Repository · Soft Binding Resolution API · io.iscc.v0</p>
+        <h1 id="hero-title">Keep Content Credentials <em>findable</em> after metadata is stripped</h1>
+        <p class="lead">
+          This store keeps C2PA Manifest Stores and serves each one at a stable manifest address. It finds them by
+          soft binding through the C2PA Soft Binding Resolution API, and declares their ISCC on the ISCC Discovery
+          Protocol, so that the ISCC C2PA Resolver finds them network-wide.
+        </p>
+        <p class="actions">
+          <a class="btn btn--primary" href="{% url 'docs' %}">API reference</a>
+          <a class="btn" href="{% url 'openapi' 'openapi.yaml' %}">OpenAPI</a>
+          <a class="btn" href="https://github.com/iscc/iscc-c2pa-store">GitHub</a>
+        </p>
+        <p class="notice"><strong>Experimental (beta, MVP).</strong> Provided as is, without warranty of any kind.
+          The API, the declaration behaviour and the public instances may change in breaking ways before version 1.0.
+          The test instance declares on the ISCC testnet; its data is disposable.</p>
+      </div>
+
+      <aside class="ways" aria-labelledby="ways-title">
+        <h2 class="ways__title" id="ways-title">One upload, three ways back</h2>
+        <ul class="ways__list">
+          <li>
+            <p class="label">Manifest address</p>
+            <code>{{ base_url }}/v1/manifests/{manifestId}</code>
+            <p>Stable, public, byte for byte as uploaded.</p>
+          </li>
+          <li>
+            <p class="label">Soft binding query</p>
+            <code>GET /v1/matches/byBinding</code>
+            <p>Exact match for every listed algorithm, similarity for io.iscc.v0.</p>
+          </li>
+          <li>
+            <p class="label">ISCC declaration</p>
+            {% if declares %}
+            <code>{{ hub_url }}</code>
+            <p>The manifest address is the gateway URL, so the ISCC C2PA Resolver finds it network-wide.</p>
+            {% else %}
+            <code class="off">Off on this instance</code>
+            <p>This instance hosts manifests without declaring them on the ISCC Discovery Protocol.</p>
+            {% endif %}
+          </li>
+        </ul>
+      </aside>
+    </section>
+
+    <section id="how" aria-labelledby="how-title">
+      <div class="section__head">
+        <h2 id="how-title">How it works</h2>
+        <p>An app publishes a signed Manifest Store. The store declares its ISCC. Anyone holding a copy of the
+          content, even with every byte of metadata gone, computes the ISCC and gets the manifest back.</p>
+      </div>
+
+      <figure class="diagram">
+        <svg class="diagram__wide" viewBox="0 36 1000 236" role="img" aria-labelledby="dw-title dw-desc">
+          <title id="dw-title">From publishing to recovery</title>
+          <desc id="dw-desc">Four parts from left to right: your app, this C2PA Store, an ISCC hub and the ISCC C2PA
+            Resolver. Step 1: the app publishes a C2PA Manifest Store to the store. Step 2: the store declares the
+            ISCC of the content on the ISCC hub, with the manifest address as gateway URL. Step 3: the resolver looks
+            up an ISCC on the hub and fetches the manifest from the store.</desc>
+          <rect class="d-node" x="10" y="72" width="190" height="96" rx="4"/>
+          <text class="d-title" x="105" y="114" text-anchor="middle">Your app</text>
+          <text class="d-sub" x="105" y="140" text-anchor="middle">C2PA SIGNER</text>
+
+          <rect class="d-node d-node--self" x="273" y="72" width="190" height="96" rx="4"/>
+          <text class="d-title" x="368" y="114" text-anchor="middle">C2PA Store</text>
+          <text class="d-sub" x="368" y="140" text-anchor="middle">THIS REPOSITORY</text>
+
+          <rect class="d-node" x="536" y="72" width="190" height="96" rx="4"/>
+          <text class="d-title" x="631" y="114" text-anchor="middle">ISCC hub</text>
+          <text class="d-sub" x="631" y="140" text-anchor="middle">DISCOVERY PROTOCOL</text>
+
+          <rect class="d-node" x="800" y="72" width="190" height="96" rx="4"/>
+          <text class="d-title" x="895" y="114" text-anchor="middle">C2PA Resolver</text>
+          <text class="d-sub" x="895" y="140" text-anchor="middle">NETWORK-WIDE SEARCH</text>
+
+          <text class="d-tag d-tag--step" x="236.5" y="56" text-anchor="middle">1 PUBLISH</text>
+          <path class="d-flow" d="M200 120 H263"/>
+          <polygon class="d-head" points="263,114 273,120 263,126"/>
+
+          <text class="d-tag d-tag--step" x="499.5" y="56" text-anchor="middle">2 DECLARE</text>
+          <path class="d-flow" d="M463 120 H526"/>
+          <polygon class="d-head" points="526,114 536,120 526,126"/>
+
+          <text class="d-tag" x="763" y="56" text-anchor="middle">LOOK UP</text>
+          <path class="d-flow" d="M800 120 H736"/>
+          <polygon class="d-head" points="736,114 726,120 736,126"/>
+
+          <path class="d-flow d-flow--back" d="M895 168 C895 268 368 268 368 180"/>
+          <polygon class="d-head--back" points="362,180 368,170 374,180"/>
+          <rect class="d-pad" x="579" y="232" width="104" height="24"/>
+          <text class="d-tag d-tag--step" x="631" y="249" text-anchor="middle">3 RECOVER</text>
+        </svg>
+        <svg class="diagram__narrow" viewBox="0 0 360 560" role="img" aria-labelledby="dn-title dn-desc">
+          <title id="dn-title">From publishing to recovery</title>
+          <desc id="dn-desc">Four parts from top to bottom: your app, this C2PA Store, an ISCC hub and the ISCC C2PA
+            Resolver. Step 1: the app publishes a C2PA Manifest Store to the store. Step 2: the store declares the
+            ISCC of the content on the ISCC hub, with the manifest address as gateway URL. Step 3: the resolver looks
+            up an ISCC on the hub and fetches the manifest from the store.</desc>
+          <rect class="d-node" x="20" y="10" width="240" height="88" rx="4"/>
+          <text class="d-title" x="140" y="50" text-anchor="middle">Your app</text>
+          <text class="d-sub" x="140" y="76" text-anchor="middle">C2PA SIGNER</text>
+
+          <rect class="d-node d-node--self" x="20" y="160" width="240" height="88" rx="4"/>
+          <text class="d-title" x="140" y="200" text-anchor="middle">C2PA Store</text>
+          <text class="d-sub" x="140" y="226" text-anchor="middle">THIS REPOSITORY</text>
+
+          <rect class="d-node" x="20" y="310" width="240" height="88" rx="4"/>
+          <text class="d-title" x="140" y="350" text-anchor="middle">ISCC hub</text>
+          <text class="d-sub" x="140" y="376" text-anchor="middle">DISCOVERY PROTOCOL</text>
+
+          <rect class="d-node" x="20" y="460" width="240" height="88" rx="4"/>
+          <text class="d-title" x="140" y="500" text-anchor="middle">C2PA Resolver</text>
+          <text class="d-sub" x="140" y="526" text-anchor="middle">NETWORK-WIDE SEARCH</text>
+
+          <path class="d-flow" d="M140 98 V150"/>
+          <polygon class="d-head" points="134,150 140,160 146,150"/>
+          <text class="d-tag d-tag--step" x="156" y="134">1 PUBLISH</text>
+
+          <path class="d-flow" d="M140 248 V300"/>
+          <polygon class="d-head" points="134,300 140,310 146,300"/>
+          <text class="d-tag d-tag--step" x="156" y="284">2 DECLARE</text>
+
+          <path class="d-flow" d="M140 460 V408"/>
+          <polygon class="d-head" points="134,408 140,398 146,408"/>
+          <text class="d-tag" x="156" y="434">LOOK UP</text>
+
+          <path class="d-flow d-flow--back" d="M260 504 C328 504 328 204 270 204"/>
+          <polygon class="d-head--back" points="270,198 260,204 270,210"/>
+          <text class="d-tag d-tag--step" x="340" y="354" text-anchor="middle" transform="rotate(-90 340 354)">3 RECOVER</text>
+        </svg>
+        <figcaption>The manifest address is the gateway URL of the ISCC declaration: whoever finds the declaration
+          finds the manifest.</figcaption>
+      </figure>
+
+      <ol class="steps">
+        <li>
+          <h3>Publish</h3>
+          <p>Your app signs content with C2PA, adds an <code>io.iscc.v0</code> soft binding and posts the Manifest
+            Store. The store checks it with c2pa-rs, indexes the soft bindings of the active manifest and serves it
+            byte for byte at its manifest address.</p>
+        </li>
+        <li>
+          <h3>Declare</h3>
+          <p>The store signs an ISCC declaration with its own did:web key and registers it on an ISCC hub, with the
+            manifest address as gateway URL. Apps that declare by themselves upload with <code>declare=false</code>.</p>
+        </li>
+        <li>
+          <h3>Recover</h3>
+          <p>Metadata stripped, file re-encoded? Compute the ISCC of the content and ask this store directly, or ask
+            the ISCC C2PA Resolver, which searches every declaration on the network and leads back to the manifest
+            address.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section id="use" aria-labelledby="use-title">
+      <div class="section__head">
+        <h2 id="use-title">Use it</h2>
+        <p>Plain HTTP, no account. The routes follow the C2PA Soft Binding Resolution API; the
+          <a href="{% url 'docs' %}">API reference</a> has every parameter and status code.</p>
+      </div>
+
+      <div class="recipes">
+        <article class="recipe recipe--wide" aria-labelledby="r-publish">
+          <h3 id="r-publish">Publish a Manifest Store</h3>
+          <p>Send the bytes of a C2PA Manifest Store. Uploading the same bytes again returns the same answer.</p>
+          <figure class="code code--cmd">
+            <figcaption>Request</figcaption>
+            <pre><code>curl --data-binary @manifest.c2pa -H "Content-Type: application/c2pa" "{{ base_url }}/v1/manifests"</code></pre>
+          </figure>
+          <figure class="code">
+            <figcaption>Answer · 200</figcaption>
+<pre><code>{
+  <span class="t-key">"manifestId"</span>: <span class="t-str">"urn:c2pa:F9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4"</span>,
+  <span class="t-key">"manifestUrl"</span>: <span class="t-str">"{{ base_url }}/v1/manifests/urn%3Ac2pa%3AF9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4"</span>,
+  <span class="t-key">"declaration"</span>: {
+{% if declares %}    <span class="t-key">"status"</span>: <span class="t-str">"declared"</span>,
+    <span class="t-key">"isccId"</span>: <span class="t-str">"ISCC:MAIGKV5FAAXOXYAB"</span>,
+    <span class="t-key">"hub"</span>: <span class="t-str">"{{ hub_url }}"</span>
+{% else %}    <span class="t-key">"status"</span>: <span class="t-str">"disabled"</span>
+{% endif %}  }
+}</code></pre>
+          </figure>
+          <p class="note">The declaration status is <code>declared</code>, <code>pending</code> (the hub was
+            unavailable; the store retries), <code>failed</code>, <code>skipped</code> (no whole-asset
+            <code>io.iscc.v0</code> binding with a 256-bit Data-Code and Instance-Code, or <code>declare=false</code>) or
+            <code>disabled</code> (this instance does not declare).</p>
+        </article>
+
+        <article class="recipe" aria-labelledby="r-fetch">
+          <h3 id="r-fetch">Fetch by manifest ID</h3>
+          <p>Percent-encode the manifest ID. Unknown manifests answer 404, deleted ones 410.</p>
+          <figure class="code code--cmd">
+            <figcaption>Request</figcaption>
+            <pre><code>curl -o manifest.c2pa "{{ base_url }}/v1/manifests/urn%3Ac2pa%3AF9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4"</code></pre>
+          </figure>
+        </article>
+
+        <article class="recipe" aria-labelledby="r-query">
+          <h3 id="r-query">Find by soft binding</h3>
+          <p>The value is the base64 ISCC-SEQ of the asset
+            (<a href="https://ieps.iscc.codes/iep-0020/">IEP-0020</a>), percent-encoded.</p>
+          <figure class="code code--cmd">
+            <figcaption>Request</figcaption>
+            <pre><code>curl "{{ base_url }}/v1/matches/byBinding?alg=io.iscc.v0&amp;value=&lt;percent-encoded value&gt;"</code></pre>
+          </figure>
+          <figure class="code">
+            <figcaption>Answer · 200</figcaption>
+<pre><code>{<span class="t-key">"matches"</span>: [{
+  <span class="t-key">"manifestId"</span>: <span class="t-str">"urn:c2pa:F9168C5E-…"</span>,
+  <span class="t-key">"similarityScore"</span>: <span class="t-num">97</span>,
+  <span class="t-key">"isccId"</span>: <span class="t-str">"ISCC:MAIGKV5FAAXOXYAB"</span>
+}]}</code></pre>
+          </figure>
+          <p class="note">Other algorithms on the C2PA Soft Binding Algorithm List match exactly. Long values go in a
+            JSON body to <code>POST /v1/matches/byBinding</code>.</p>
+        </article>
+
+        <article class="recipe recipe--wide" aria-labelledby="r-service">
+          <h3 id="r-service">Discover the service</h3>
+          <p>Capabilities, indexed algorithms, status and the C2PA discovery document.</p>
+          <figure class="code code--cmd">
+            <figcaption>Requests</figcaption>
+            <pre><code>curl "{{ base_url }}/v1/services/capabilities"</code><code>curl "{{ base_url }}/v1/services/supportedAlgorithms"</code></pre>
+          </figure>
+          <figure class="code code--cmd">
+            <figcaption>Requests</figcaption>
+            <pre><code>curl "{{ base_url }}/v1/services/status"</code><code>curl "{{ base_url }}/.well-known/c2pa-soft-binding-resolution"</code></pre>
+          </figure>
+        </article>
+      </div>
+    </section>
+
+    <section id="numbers" aria-labelledby="numbers-title">
+      <div class="section__head">
+        <h2 id="numbers-title">Numbers</h2>
+        <p>Counted from the database, refreshed every 30 seconds.</p>
+      </div>
+
+      <dl class="figures">
+        <div class="figure">
+          <dt><strong>Manifests</strong>stored and served</dt>
+          <dd>{{ stats.manifests }}</dd>
+        </div>
+        <div class="figure">
+          <dt><strong>Trusted signers</strong>manifests signed with a credential on the C2PA trust list</dt>
+          <dd>{{ stats.trusted }}</dd>
+        </div>
+        <div class="figure">
+          <dt><strong>Declared</strong>on the ISCC Discovery Protocol</dt>
+          <dd>{{ stats.declarations.declared|default:0 }}</dd>
+        </div>
+        <div class="figure">
+          <dt><strong>Pending</strong>declarations the store retries</dt>
+          <dd>{{ stats.declarations.pending|default:0 }}</dd>
+        </div>
+      </dl>
+
+      <div class="breakdown">
+        <div>
+          <h3>Soft bindings per algorithm</h3>
+          {% if stats.bindings %}
+          {% with top=stats.bindings.items|dictsortreversed:1|first %}
+          <ul class="tally">
+            {% for alg, count in stats.bindings.items %}
+            <li>
+              <code>{{ alg }}</code>
+              <span class="n">{{ count }}</span>
+              <meter min="0" max="{{ top.1 }}" value="{{ count }}" aria-label="{{ alg }}: {{ count }} soft binding{{ count|pluralize }}"></meter>
+            </li>
+            {% endfor %}
+          </ul>
+          {% endwith %}
+          {% else %}
+          <p class="empty">No soft bindings indexed yet.</p>
+          {% endif %}
+        </div>
+        <div>
+          <h3>Declarations by status</h3>
+          {% if stats.declarations %}
+          <ul class="tally">
+            {% for status, count in stats.declarations.items %}
+            <li>
+              <span class="dot dot--{{ status }}">{{ status }}</span>
+              <span class="n">{{ count }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="empty">No declarations yet.</p>
+          {% endif %}
+        </div>
+      </div>
+      <p class="footnote">{{ stats.deleted }} deleted manifest{{ stats.deleted|pluralize }} not counted above.</p>
+    </section>
+
+    <section id="instance" aria-labelledby="instance-title">
+      <div class="section__head">
+        <h2 id="instance-title">This instance</h2>
+        <p>What this deployment is, who signs its declarations and what it accepts.</p>
+      </div>
+
+      <dl class="facts">
+        <dt>Host</dt>
+        <dd><code>{{ host }}</code></dd>
+
+        {% if declares %}
+        <dt>Identity</dt>
+        <dd>
+          <a href="/.well-known/did.json"><code>{{ controller }}</code></a>
+          <p>Signs ISCC declarations with the Ed25519 key in its did:web document.</p>
+        </dd>
+
+        <dt>ISCC hub</dt>
+        <dd>
+          <a href="{{ hub_url }}">{{ hub_url }}</a>
+          <p>Holds the declarations, each with its manifest address as gateway URL.</p>
+        </dd>
+        {% else %}
+        <dt>Declarations</dt>
+        <dd>
+          <span class="pill">Off</span>
+          <p>This instance hosts and serves manifests without declaring them on the ISCC Discovery Protocol.</p>
+        </dd>
+        {% endif %}
+
+        <dt>Uploads</dt>
+        <dd>
+          Open, limited per client address, up to {{ max_upload_mb|floatformat }} MB per Manifest Store.
+          <p>Only Manifest Stores that c2pa-rs reads and whose claim signature verifies. Failed hard bindings and
+            signers outside the C2PA trust list are recorded, not refused. Deleting needs the operator token.</p>
+        </dd>
+
+        <dt>Data</dt>
+        <dd>
+          Public: anyone can fetch and query what is stored here.
+          <p>Experimental service. Data on the testnet is disposable and may be removed without notice.</p>
+        </dd>
+
+        <dt>Version</dt>
+        <dd><code>{{ version }}</code></dd>
+      </dl>
+    </section>
+  </main>
+
+  <footer class="bar bar--footer">
+    <p>© <a href="https://iscc.io">ISCC Foundation</a> · Apache-2.0</p>
+    <ul class="footer__links">
+      <li><a href="https://c2pa.iscc.io">ISCC C2PA Resolver</a></li>
+      <li><a href="https://c2pa.org">C2PA</a></li>
+      <li><a href="https://github.com/iscc/iscc-c2pa-store">GitHub</a></li>
+      <li><a href="https://iscc.io/privacy">Privacy</a></li>
+      <li><a href="https://iscc.io/imprint">Imprint</a></li>
+    </ul>
+    <span class="version">v{{ version }}</span>
+  </footer>
+</body>
+</html>
