@@ -26,7 +26,7 @@ ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     DJANGO_STATIC_ROOT=/app/staticfiles \
     ISCC_C2PA_STORE_DATA_DIR=/data \
-    GUNICORN_CMD_ARGS="--bind 0.0.0.0:8000 --workers 1 --threads 8 --timeout 30 --access-logfile -"
+    GUNICORN_CMD_ARGS="--bind 0.0.0.0:8000 --workers 1 --threads 8 --timeout 30 --no-control-socket --access-logfile - --access-logformat '%(h)s %({x-forwarded-for}i)s %(t)s \"%(r)s\" %(s)s %(b)s %(M)sms'"
 USER store
 WORKDIR /app
 VOLUME /data

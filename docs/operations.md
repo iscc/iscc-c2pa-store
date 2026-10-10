@@ -38,10 +38,11 @@ The image runs as the unprivileged user `store` (uid 10001), listens on port 800
     `python manage.py retry_declarations`, which retries pending declarations and unfinished withdrawals
     ([Declarations](declarations.md#retries)). A failing round is logged and the loop goes on; a value that `sleep`
     does not accept makes it wait 120 seconds instead.
-1. gunicorn in the foreground, configured by `GUNICORN_CMD_ARGS`. The image sets it to
-    `--bind 0.0.0.0:8000 --workers 1 --threads 8 --timeout 30 --access-logfile -`: port 8000, one worker process
-    with 8 threads, a 30 second timeout, access log on stdout. Forwarded headers are read by the store itself, not
-    by gunicorn ([Behind a reverse proxy](#behind-a-reverse-proxy)).
+1. gunicorn in the foreground, configured by `GUNICORN_CMD_ARGS`. The image sets it to port 8000, one worker
+    process with 8 threads, a 30 second timeout, no control socket, and an access log on stdout whose lines show
+    the peer address followed by the `X-Forwarded-For` header, so the client behind a proxy is visible (the full
+    value is in `.env.example`). Forwarded headers are read by the store itself, not by gunicorn
+    ([Behind a reverse proxy](#behind-a-reverse-proxy)).
 
 The single worker is deliberate. Rate limit counters live in the memory of the process (Django's local memory
 cache), so more worker processes would each count separately and multiply the limits. Threads keep uploads and
