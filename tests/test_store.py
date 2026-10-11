@@ -21,7 +21,6 @@ import iscc_crypto as icr
 import pytest
 from conftest import (
     C2PA_RS_MANIFEST,
-    CHAIN,
     CONTENT,
     DATA_CODE,
     DIGITAL,
@@ -32,11 +31,11 @@ from conftest import (
     VECTOR_1,
     FakeHub,
     encode,
-    es256,
     flip,
     iscc_manifest,
     iscc_units,
     sign_manifest,
+    signer,
 )
 from django.core.cache import cache
 from django.core.files.base import ContentFile
@@ -77,9 +76,8 @@ def signed(blocks=(), label=None, title="test.jpg"):
     }
     if label:
         definition["label"] = label
-    signer = c2pa.Signer.from_callback(es256, c2pa.C2paSigningAlg.ES256, CHAIN.pem, None)
     with c2pa.Builder(definition) as builder:
-        return builder.sign(signer, "image/jpeg", io.BytesIO(JPEG.getvalue()), io.BytesIO())
+        return builder.sign(signer(), "image/jpeg", io.BytesIO(JPEG.getvalue()), io.BytesIO())
 
 
 def new_label():

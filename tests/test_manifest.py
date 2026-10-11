@@ -1,9 +1,11 @@
 """Tests of reading uploaded C2PA Manifest Stores with c2pa-rs and the acceptance policy, on real signed stores."""
 
 import base64
+import datetime as dt
 import functools
 import io
 import json
+import time
 import uuid
 
 import c2pa
@@ -11,7 +13,6 @@ import iscc_core as ic
 import pytest
 from conftest import (
     C2PA_RS_MANIFEST,
-    CHAIN,
     CONTENT,
     DATA,
     DATA_CODE,
@@ -19,13 +20,15 @@ from conftest import (
     INSTANCE,
     JPEG,
     VECTOR_1,
-    es256,
     iscc_manifest,
+    make_chain,
     sign_manifest,
+    signer,
 )
 
 from iscc_c2pa_store import manifest
 from iscc_c2pa_store.manifest import (
+    EXPIRED,
     HARD_BINDING_FAILURES,
     MAX_ID_LENGTH,
     SIGNATURE_VALIDATED,
@@ -36,6 +39,7 @@ from iscc_c2pa_store.manifest import (
     SoftBinding,
     block_value,
     check_failures,
+    check_ingredients,
     claim_generator,
     context,
     read,
@@ -46,8 +50,10 @@ READER_JSON = c2pa.Reader.json  # the real report, for the test that removes its
 # A real Manifest Store with a CAWG identity assertion (identity claims aggregation), signed by Adobe Content
 # Authenticity: the bare JUMBF from the JPEG APP11 segments of the c2pa-rs test fixture C_with_CAWG_data.jpg
 # (sdk/tests/fixtures, Apache-2.0 or MIT; copied from c2pa-cpp/tests/fixtures). Its signing certificate has expired
-# and its time stamp is not on the trust list, so c2pa-rs reports signingCredential.expired.
+# and its time stamp is not on the trust list, so c2pa-rs reports signingCredential.expired. Its ingredient
+# manifest is intact, but its credential is not on the trust list either: an ingredient delta of trust only.
 CAWG_MANIFEST = (DATA / "cawg-c2pa-rs.c2pa").read_bytes()
+PARENT_TITLE = b"tamper-me-parent.jpg"  # the title of the ingredient manifest of `sign_with_parent`
 
 
 def report_without_active_manifest(reader):
@@ -81,9 +87,42 @@ def sign_labelled(label):
             {"label": "c2pa.actions", "data": {"actions": [{"action": "c2pa.created", "digitalSourceType": DIGITAL}]}}
         ],
     }
-    signer = c2pa.Signer.from_callback(es256, c2pa.C2paSigningAlg.ES256, CHAIN.pem, None)
     with c2pa.Builder(definition) as builder:
-        return builder.sign(signer, "image/jpeg", io.BytesIO(JPEG.getvalue()), io.BytesIO())
+        return builder.sign(signer(), "image/jpeg", io.BytesIO(JPEG.getvalue()), io.BytesIO())
+
+
+def sign_with_parent():
+    # type: () -> bytes
+    """A Manifest Store whose parent ingredient is a JPEG with a signed manifest of its own, titled PARENT_TITLE."""
+    parent = io.BytesIO()
+    actions = {"actions": [{"action": "c2pa.created", "digitalSourceType": DIGITAL}]}
+    definition = {"title": PARENT_TITLE.decode(), "assertions": [{"label": "c2pa.actions", "data": actions}]}
+    with c2pa.Builder(definition) as builder:
+        builder.sign(signer(), "image/jpeg", io.BytesIO(JPEG.getvalue()), parent)
+    actions = {"actions": [{"action": "c2pa.opened", "parameters": {"ingredientIds": ["parent"]}}]}
+    definition = {"title": "child.jpg", "assertions": [{"label": "c2pa.actions", "data": actions}]}
+    ingredient = {"title": "parent.jpg", "relationship": "parentOf", "label": "parent"}
+    with c2pa.Builder(definition) as builder:
+        parent.seek(0)
+        builder.add_ingredient(json.dumps(ingredient), "image/jpeg", parent)
+        parent.seek(0)
+        return builder.sign(signer(), "image/jpeg", parent, io.BytesIO())
+
+
+def delta(*codes):
+    # type: (str) -> dict
+    """An ingredient delta as it appears in a c2pa-rs report, with the given failure codes."""
+    failures = [{"code": code, "url": "self#jumbf=/c2pa/urn:c2pa:x"} for code in codes]
+    return {
+        "ingredientAssertionURI": "self#jumbf=c2pa.assertions/c2pa.ingredient.v3",
+        "validationDeltas": {"success": [], "informational": [], "failure": failures},
+    }
+
+
+def extended(data):
+    # type: (bytes) -> bytes
+    """The same Manifest Store with the extended JUMBF superbox header: LBox 1 and the length in a 64-bit XLBox."""
+    return (1).to_bytes(4, "big") + data[4:8] + (len(data) + 8).to_bytes(8, "big") + data[8:]
 
 
 def refusal(data, trust_anchors=manifest.TRUST_ANCHORS):
@@ -212,10 +251,32 @@ def test_cawg_identity_assertions_are_not_evaluated_with_other_anchors(trust_anc
     assert [code for code in codes if code.startswith("cawg.")] == []
 
 
-def test_read_refuses_cawg_fixture_for_its_expired_signer():
-    error = refusal(CAWG_MANIFEST)
-    assert error.code == "signingCredential.expired"
-    assert error.message == "The active manifest failed validation"
+def test_read_accepts_cawg_fixture_with_its_expired_signer_as_untrusted():
+    info = read(CAWG_MANIFEST)
+    assert info.trusted is False
+    assert info.failures == (UNTRUSTED, EXPIRED, "assertion.dataHash.mismatch")
+    assert info.signed_at == "2025-05-30T20:15:55+00:00"  # from a time stamp that is not on the trust list
+
+
+def test_read_accepts_cawg_fixture_with_its_untrusted_ingredient():
+    report = manifest.parse(CAWG_MANIFEST, manifest.TRUST_ANCHORS)
+    (ingredient,) = report["validation_results"]["ingredientDeltas"]
+    assert [item["code"] for item in ingredient["validationDeltas"]["failure"]] == [UNTRUSTED]
+    assert read(CAWG_MANIFEST).manifest_id == report["active_manifest"]
+
+
+def test_read_records_an_expired_trusted_credential_as_untrusted(tmp_path):
+    # the signing certificate expires within three seconds, so the store is signed and read while it is valid, and
+    # read again after it expired
+    chain = make_chain(dt.datetime.now(dt.UTC) - dt.timedelta(days=30, seconds=-3))
+    data = sign_manifest(chain=chain)
+    anchors = tmp_path / "trust.pem"
+    anchors.write_text(chain.ca_pem, encoding="utf-8")
+    assert read(data, anchors).trusted is True
+    time.sleep(4)
+    info = read(data, anchors)
+    assert info.trusted is False
+    assert info.failures == (UNTRUSTED, EXPIRED, "assertion.dataHash.mismatch")
 
 
 @pytest.mark.parametrize(
@@ -239,6 +300,75 @@ def test_read_refuses_truncated_store(keep):
     data = iscc_manifest()
     cut = keep if isinstance(keep, int) else int(len(data) * keep)
     assert refusal(data[:cut]).code == "manifest.unreadable"
+
+
+@pytest.mark.parametrize(
+    "tail",
+    [b"\x00", b"<html>anything</html>", bytes(range(256)) * 4096, C2PA_RS_MANIFEST],
+    ids=["byte", "html", "megabyte", "second-store"],
+)
+def test_read_refuses_bytes_after_the_store(tail):
+    # c2pa-rs alone reads the first JUMBF superbox and ignores the tail
+    assert manifest.parse(C2PA_RS_MANIFEST + tail, manifest.TRUST_ANCHORS)["active_manifest"]
+    error = refusal(C2PA_RS_MANIFEST + tail)
+    assert error.code == "manifest.trailingData"
+    assert error.message == "The upload must be the Manifest Store alone, as one JUMBF superbox"
+
+
+def test_read_accepts_an_extended_box_length():
+    info = read(extended(C2PA_RS_MANIFEST))
+    assert info == read(C2PA_RS_MANIFEST)
+
+
+def test_read_refuses_bytes_after_a_store_with_extended_box_length():
+    data = extended(C2PA_RS_MANIFEST) + b"\x00"
+    assert manifest.parse(data, manifest.TRUST_ANCHORS)["active_manifest"]
+    assert refusal(data).code == "manifest.trailingData"
+
+
+def test_read_refuses_a_box_that_extends_to_the_end():
+    # LBox 0 (the box ends with the file) is valid JUMBF, but c2pa-rs does not read it
+    assert refusal(b"\x00\x00\x00\x00" + C2PA_RS_MANIFEST[4:]).code == "manifest.unreadable"
+
+
+def test_read_accepts_an_intact_ingredient_manifest():
+    data = sign_with_parent()
+    assert data.count(PARENT_TITLE) == 1  # in the claim of the ingredient manifest only
+    assert read(data).title == "child.jpg"
+
+
+def test_read_refuses_a_tampered_ingredient_manifest():
+    error = refusal(tamper(sign_with_parent(), PARENT_TITLE, PARENT_TITLE.upper()))
+    assert error.code == "ingredient.manifest.mismatch"
+    assert error.message == "An ingredient manifest failed validation"
+
+
+@pytest.mark.parametrize(
+    "deltas",
+    [
+        [],
+        [delta()],
+        [delta(UNTRUSTED, EXPIRED, "signingCredential.ocsp.skipped")],
+        [delta(UNTRUSTED), delta(EXPIRED)],
+        [{"ingredientAssertionURI": "self#jumbf=c2pa.assertions/c2pa.ingredient.v3"}],
+    ],
+)
+def test_check_ingredients_tolerates_differences_of_trust(deltas):
+    assert check_ingredients(deltas) is None
+
+
+@pytest.mark.parametrize(
+    ("deltas", "code"),
+    [
+        ([delta("ingredient.manifest.mismatch", "claimSignature.mismatch")], "ingredient.manifest.mismatch"),
+        ([delta(UNTRUSTED), delta(EXPIRED, "assertion.hashedURI.mismatch")], "assertion.hashedURI.mismatch"),
+        ([delta("timeStamp.mismatch")], "timeStamp.mismatch"),
+    ],
+)
+def test_check_ingredients_refuses_mismatches(deltas, code):
+    with pytest.raises(InvalidManifestError) as info:
+        check_ingredients(deltas)
+    assert info.value.code == code
 
 
 def test_read_refuses_tampered_soft_binding_algorithm():
@@ -311,6 +441,8 @@ def test_context_is_cached_per_trust_list(trust_anchors):
 
 def test_tolerated_failures():
     assert UNTRUSTED in TOLERATED_FAILURES
+    assert EXPIRED in TOLERATED_FAILURES
+    assert "signingCredential.revoked" not in TOLERATED_FAILURES
     assert HARD_BINDING_FAILURES < TOLERATED_FAILURES
     assert "assertion.hashedURI.mismatch" not in TOLERATED_FAILURES
 
@@ -322,6 +454,7 @@ def test_tolerated_failures():
         [UNTRUSTED],
         sorted(HARD_BINDING_FAILURES),
         [UNTRUSTED, "assertion.bmffHash.mismatch"],
+        [UNTRUSTED, EXPIRED, "assertion.dataHash.mismatch"],
     ],
 )
 def test_check_failures_accepts_tolerated_failures(failures):
@@ -334,7 +467,7 @@ def test_check_failures_accepts_tolerated_failures(failures):
         (["claimSignature.mismatch"], "claimSignature.mismatch"),
         ([UNTRUSTED, "assertion.hashedURI.mismatch", "claim.malformed"], "assertion.hashedURI.mismatch"),
         (["assertion.dataHash.mismatch", "signingCredential.revoked"], "signingCredential.revoked"),
-        (["signingCredential.expired"], "signingCredential.expired"),
+        ([EXPIRED, "signingCredential.invalid"], "signingCredential.invalid"),
     ],
 )
 def test_check_failures_refuses_with_the_first_intolerable_code(failures, code):

@@ -61,8 +61,9 @@ curl "https://c2pa-store-test.iscc.io/v1/matches/byBinding?alg=io.iscc.v0&value=
 ## What it implements
 
 - `POST /v1/manifests`: accepts a Manifest Store that c2pa-rs reads, without network access, and whose active
-    manifest has a verified claim signature; hard-binding failures (no asset) and untrusted signing credentials are
-    recorded, not refused; manifest IDs are first come, first served
+    manifest has a verified claim signature; hard-binding failures (no asset) and untrusted or expired signing
+    credentials are recorded, not refused; bytes after the Manifest Store and tampered ingredient manifests are
+    refused; manifest IDs are first come, first served
 - `GET /v1/manifests/{manifestId}`: the stored bytes, unchanged; `DELETE` with the operator token deletes them and
     withdraws the declaration; every `GET` route also answers `HEAD`
 - `GET` and `POST /v1/matches/byBinding`, with `io.iscc.v0` values as specified in

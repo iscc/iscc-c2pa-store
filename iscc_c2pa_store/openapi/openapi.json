@@ -43,7 +43,7 @@
           "store"
         ],
         "summary": "Add a C2PA Manifest Store to the repository",
-        "description": "The body is a C2PA Manifest Store. It is accepted when c2pa-rs reads it and the claim signature of its active\nmanifest verifies; hard-binding failures (the asset is not uploaded) and signing credentials outside the C2PA\ntrust list are recorded, not refused. Uploading the same bytes again returns the same result. A manifest ID\nthat is already taken by other bytes, or was deleted, is refused with 409.\n\nWhen the active manifest carries an `io.iscc.v0` soft binding with a 256-bit Data-Code and Instance-Code, the\nstore declares it on the ISCC Discovery Protocol under its own key, with `manifestUrl` as gateway URL, unless\n`declare=false`.\n",
+        "description": "The body is a C2PA Manifest Store. It is accepted when c2pa-rs reads it and the claim signature of its active\nmanifest verifies; hard-binding failures (the asset is not uploaded) and signing credentials outside the C2PA\ntrust list or expired are recorded, not refused. Bytes after the Manifest Store, and ingredient manifests\nchanged after signing, are refused. Uploading the same bytes again returns the same result. A manifest ID\nthat is already taken by other bytes, or was deleted, is refused with 409.\n\nWhen the active manifest carries an `io.iscc.v0` soft binding with a 256-bit Data-Code and Instance-Code, the\nstore declares it on the ISCC Discovery Protocol under its own key, with `manifestUrl` as gateway URL, unless\n`declare=false`.\n",
         "operationId": "addManifest",
         "parameters": [
           {

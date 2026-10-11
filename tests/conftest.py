@@ -8,6 +8,7 @@ the CA as a trust list, for tests of the trusted path.
 
 import base64
 import datetime as dt
+import functools
 import io
 import itertools
 import json
@@ -90,10 +91,11 @@ class Chain:
     ca_pem: str
 
 
-def make_chain():
-    # type: () -> Chain
-    """Create a CA and an ES256 leaf certificate that c2pa-rs accepts for claim signing."""
-    now = dt.datetime.now(dt.UTC)
+def make_chain(now=None):
+    # type: (dt.datetime | None) -> Chain
+    """Create a CA and an ES256 leaf certificate that c2pa-rs accepts for claim signing, valid for 30 days from
+    `now` (by default the current time)."""
+    now = now or dt.datetime.now(dt.UTC)
     ca_key = ec.generate_private_key(ec.SECP256R1())
     ca = (
         x509.CertificateBuilder()
@@ -132,15 +134,21 @@ JPEG = io.BytesIO()
 Image.new("RGB", (32, 32), (0, 84, 178)).save(JPEG, "JPEG")
 
 
-def es256(data):
-    # type: (bytes) -> bytes
+def es256(data, chain=CHAIN):
+    # type: (bytes, Chain) -> bytes
     """Sign for c2pa-rs: ES256 with the raw r||s signature encoding of COSE."""
-    r, s = decode_dss_signature(CHAIN.key.sign(data, ec.ECDSA(hashes.SHA256())))
+    r, s = decode_dss_signature(chain.key.sign(data, ec.ECDSA(hashes.SHA256())))
     return r.to_bytes(32, "big") + s.to_bytes(32, "big")
 
 
-def sign_manifest(bindings=None, title="test.jpg"):
-    # type: (list[tuple[str, str]] | None, str) -> bytes
+def signer(chain=CHAIN):
+    # type: (Chain) -> c2pa.Signer
+    """A c2pa-rs signer with the key and certificates of a chain."""
+    return c2pa.Signer.from_callback(functools.partial(es256, chain=chain), c2pa.C2paSigningAlg.ES256, chain.pem, None)
+
+
+def sign_manifest(bindings=None, title="test.jpg", chain=CHAIN):
+    # type: (list[tuple[str, str]] | None, str, Chain) -> bytes
     """A fresh C2PA Manifest Store for a small JPEG, with soft-binding assertions given as (alg, base64 value)."""
     assertions = [
         {"label": "c2pa.actions", "data": {"actions": [{"action": "c2pa.created", "digitalSourceType": DIGITAL}]}}
@@ -155,9 +163,8 @@ def sign_manifest(bindings=None, title="test.jpg"):
         "format": "image/jpeg",
         "assertions": assertions,
     }
-    signer = c2pa.Signer.from_callback(es256, c2pa.C2paSigningAlg.ES256, CHAIN.pem, None)
     with c2pa.Builder(definition) as builder:
-        return builder.sign(signer, "image/jpeg", io.BytesIO(JPEG.getvalue()), io.BytesIO())
+        return builder.sign(signer(chain), "image/jpeg", io.BytesIO(JPEG.getvalue()), io.BytesIO())
 
 
 DIGITAL = "http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture"

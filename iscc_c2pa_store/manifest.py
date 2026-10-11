@@ -2,8 +2,10 @@
 
 The store accepts any Manifest Store that c2pa-rs can read and whose active manifest has a verified claim signature.
 The asset is never uploaded, so hard-binding failures are expected and tolerated; a signing credential outside the
-trust list is recorded, not refused. Every other validation failure of the active manifest refuses the upload, so a
-tampered assertion (a soft binding among them) never enters the store.
+trust list, or expired without a trusted time stamp, is recorded as untrusted, not refused. Every other validation
+failure of the active manifest refuses the upload, so a tampered assertion (a soft binding among them) never enters
+the store. Ingredient manifests changed after signing and bytes after the Manifest Store are refused as well, because
+the store serves the uploaded bytes as they are.
 """
 
 import base64
@@ -22,6 +24,8 @@ SOFT_BINDING = "c2pa.soft-binding"
 MAX_ID_LENGTH = 255  # characters of a manifest ID (the active manifest label) the store accepts
 SIGNATURE_VALIDATED = "claimSignature.validated"
 UNTRUSTED = "signingCredential.untrusted"
+EXPIRED = "signingCredential.expired"  # c2pa-rs reports an expired credential as untrusted too
+MISMATCH = ".mismatch"  # suffix of the status codes of hashes and signatures that do not match their content
 # Failures caused by the missing asset: its hard binding cannot be checked against a bare Manifest Store.
 HARD_BINDING_FAILURES = frozenset(
     {
@@ -31,7 +35,7 @@ HARD_BINDING_FAILURES = frozenset(
         "assertion.collectionHash.mismatch",
     }
 )
-TOLERATED_FAILURES = HARD_BINDING_FAILURES | {UNTRUSTED}
+TOLERATED_FAILURES = HARD_BINDING_FAILURES | {UNTRUSTED, EXPIRED}
 
 
 class InvalidManifestError(ValueError):
@@ -90,10 +94,12 @@ def read(data, trust_anchors=TRUST_ANCHORS):
     # type: (bytes, Path) -> ManifestInfo
     """Read, check and summarize a C2PA Manifest Store.
 
-    :raises InvalidManifestError: if c2pa-rs cannot read it, it has no active manifest, the claim signature does not
-        verify, or the active manifest has a validation failure other than a hard-binding or trust failure.
+    :raises InvalidManifestError: if c2pa-rs cannot read it, bytes follow it, it has no active manifest, the claim
+        signature does not verify, the active manifest has a validation failure other than a hard-binding or trust
+        failure, or an ingredient manifest was changed after signing.
     """
     report = parse(data, trust_anchors)
+    check_length(data)
     label = report.get("active_manifest")
     if not label:
         raise InvalidManifestError("manifest.missing", "The Manifest Store has no active manifest")
@@ -101,9 +107,11 @@ def read(data, trust_anchors=TRUST_ANCHORS):
         raise InvalidManifestError(
             "manifest.idInvalid", f"The manifest ID must be printable, at most {MAX_ID_LENGTH} characters"
         )
-    results = report.get("validation_results", {}).get("activeManifest", {})
-    failures = [item["code"] for item in results.get("failure", [])]
-    check_failures(failures, [item["code"] for item in results.get("success", [])])
+    results = report.get("validation_results", {})
+    active = results.get("activeManifest", {})
+    failures = [item["code"] for item in active.get("failure", [])]
+    check_failures(failures, [item["code"] for item in active.get("success", [])])
+    check_ingredients(results.get("ingredientDeltas", []))
     return summarize(label, report["manifests"][label], report.get("validation_state", ""), failures)
 
 
@@ -120,6 +128,24 @@ def parse(data, trust_anchors):
         raise InvalidManifestError("manifest.unreadable", str(e) or "Not a C2PA Manifest Store") from e
 
 
+def check_length(data):
+    # type: (bytes) -> None
+    """Refuse bytes after the Manifest Store: the length its JUMBF superbox declares must be the length of the upload.
+
+    c2pa-rs reads the first box and ignores anything after it, which the store would otherwise keep and serve.
+
+    :raises InvalidManifestError: if the box length (LBox, or the 64-bit XLBox when LBox is 1) is not the length of
+        the upload.
+    """
+    length = int.from_bytes(data[:4], "big")
+    if length == 1:
+        length = int.from_bytes(data[8:16], "big")
+    if length != len(data):
+        raise InvalidManifestError(
+            "manifest.trailingData", "The upload must be the Manifest Store alone, as one JUMBF superbox"
+        )
+
+
 def check_failures(failures, successes):
     # type: (list[str], list[str]) -> None
     """Refuse an active manifest with an unverified claim signature or an intolerable failure.
@@ -131,6 +157,20 @@ def check_failures(failures, successes):
         raise InvalidManifestError(refusing[0], "The active manifest failed validation")
     if SIGNATURE_VALIDATED not in successes:
         raise InvalidManifestError("claimSignature.missing", "The claim signature of the active manifest is unverified")
+
+
+def check_ingredients(deltas):
+    # type: (list[dict]) -> None
+    """Refuse an ingredient manifest that was changed after the active manifest was signed: one whose hashes or
+    signature no longer match. Other differences, such as an ingredient credential this store does not trust or that
+    has expired since, are tolerated.
+
+    :raises InvalidManifestError: with the first mismatch code of the c2pa-rs `ingredientDeltas`.
+    """
+    codes = [item["code"] for delta in deltas for item in delta.get("validationDeltas", {}).get("failure", [])]
+    changed = [code for code in codes if code.endswith(MISMATCH)]
+    if changed:
+        raise InvalidManifestError(changed[0], "An ingredient manifest failed validation")
 
 
 def summarize(label, manifest, validation_state, failures):

@@ -70,7 +70,8 @@ The tests use real data, no mocks of the store's own code:
     ones. Soft bindings carry the [IEP-0020](https://ieps.iscc.codes/iep-0020/) test vectors or fresh ISCC-UNITs.
 - **Manifest Stores written by c2pa-rs** in `tests/data/`: one without soft bindings, and one with a CAWG
     identity assertion, extracted from the c2pa-rs test fixture `C_with_CAWG_data.jpg` (MIT or Apache-2.0). Its
-    signing credential has expired, so it is refused, but without any `cawg.*` validation code.
+    signing credential has expired and its ingredient credential is untrusted, so it is accepted as untrusted,
+    without any `cawg.*` validation code.
 - **A fake ISCC hub** replaces the network: it checks the signature of every IsccNote and IsccNoteDelete, requires
     `X-Force-Declaration`, issues ISCC-IDs, and can refuse, fail or go down to exercise every declaration status.
 

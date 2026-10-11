@@ -41,7 +41,8 @@ paths:
       description: |
         The body is a C2PA Manifest Store. It is accepted when c2pa-rs reads it and the claim signature of its active
         manifest verifies; hard-binding failures (the asset is not uploaded) and signing credentials outside the C2PA
-        trust list are recorded, not refused. Uploading the same bytes again returns the same result. A manifest ID
+        trust list or expired are recorded, not refused. Bytes after the Manifest Store, and ingredient manifests
+        changed after signing, are refused. Uploading the same bytes again returns the same result. A manifest ID
         that is already taken by other bytes, or was deleted, is refused with 409.
 
         When the active manifest carries an `io.iscc.v0` soft binding with a 256-bit Data-Code and Instance-Code, the

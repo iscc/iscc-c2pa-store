@@ -197,7 +197,8 @@ container with the same volume and environment; migrations run on start.
 
 ## Security
 
-- Uploaded bytes are untrusted and reach c2pa-rs only. Request bodies are refused with `413` from their declared
+- Uploaded bytes are untrusted and reach c2pa-rs only; the store itself reads no more than the length of their
+    outer JUMBF box, and refuses bytes after it. Request bodies are refused with `413` from their declared
     length before anything reads them: uploads above `ISCC_C2PA_STORE_MAX_UPLOAD`, other bodies above 64 KB. A
     `Content-Length` that is not plain ASCII digits is refused with `400`.
 - The store never fetches URLs from requests or manifests, and c2pa-rs runs without network access. Its only

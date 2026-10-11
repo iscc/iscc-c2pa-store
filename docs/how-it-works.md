@@ -37,22 +37,38 @@ their ISCC soft bindings on the ISCC Discovery Protocol (IDP).
 ### 1. Check
 
 The body of `POST /v1/manifests` must be sent as `application/c2pa`. Uploaded bytes are untrusted; only c2pa-rs
-(through c2pa-python) parses them. The store accepts a Manifest Store when:
+(through c2pa-python) parses them, the store itself reads no more than the length of their outer JUMBF box. The
+store accepts a Manifest Store when:
 
 - c2pa-rs can read it and it has an active manifest;
+- the upload is the Manifest Store alone: the length of its JUMBF superbox is the length of the upload;
 - the label of the active manifest, which becomes the manifest ID, is printable and at most 255 characters long;
 - the claim signature of the active manifest verifies (`claimSignature.validated`);
-- the active manifest has no validation failure apart from the tolerated ones.
+- the active manifest has no validation failure apart from the tolerated ones;
+- no ingredient manifest was changed after the active manifest was signed.
 
-| Tolerated failure                                      | Why                                                                |
-| ------------------------------------------------------ | ------------------------------------------------------------------ |
-| Hard-binding mismatches (`dataHash`, `boxesHash`, ...) | The asset is not uploaded, so its hard binding cannot be checked   |
-| `signingCredential.untrusted`                          | Recorded as untrusted, not refused; the client decides about trust |
+| Tolerated failure                                      | Why                                                                     |
+| ------------------------------------------------------ | ----------------------------------------------------------------------- |
+| Hard-binding mismatches (`dataHash`, `boxesHash`, ...) | The asset is not uploaded, so its hard binding cannot be checked        |
+| `signingCredential.untrusted`                          | Recorded as untrusted, not refused; the client decides about trust      |
+| `signingCredential.expired`                            | Recorded as untrusted: the manifest is intact, its signing time unknown |
 
 Any other failure, a tampered soft-binding assertion among them, refuses the upload with `400` and the C2PA
-validation status code of the first failure in `code`. An expired signing credential without a trusted timestamp
-is such a failure (`signingCredential.expired`). Signing credentials are checked against the C2PA trust list that
-ships with the store.
+validation status code of the first failure in `code`. Signing credentials are checked against the C2PA trust list
+that ships with the store. A credential that has expired is accepted as untrusted unless a trusted time stamp shows
+that it was valid at signing, because refusing it would keep out older Content Credentials while protecting nothing
+that a self-signed credential could not do. Revocation is never checked online (c2pa-rs reports
+`signingCredential.ocsp.skipped`), and the `trusted` flag of a stored manifest keeps the verdict of its upload.
+
+c2pa-rs also validates the ingredient manifests in the Manifest Store and reports where they differ from what the
+active manifest recorded at signing. A difference whose code ends in `.mismatch` (a hash or signature that no longer
+matches, such as `ingredient.manifest.mismatch`) means the ingredient was changed afterwards and refuses the upload
+with that code. Differences of trust, such as an ingredient credential that is not on this store's trust list or has
+expired since, are tolerated.
+
+Bytes after the Manifest Store are refused with the code `manifest.trailingData`. c2pa-rs reads the first box and
+ignores the rest, but the store serves the uploaded bytes as they are, so it would otherwise keep and serve anything
+appended to a valid Manifest Store.
 
 c2pa-rs runs without network access: no host is allowed, so checking an upload never makes it fetch anything an
 uploader names. CAWG identity assertions are not evaluated (no `cawg.*` validation codes); they stay in the stored

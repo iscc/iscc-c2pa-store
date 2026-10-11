@@ -64,7 +64,8 @@ uv run poe docs-serve       # docs preview on 127.0.0.1:45471
 - `api.py` stays thin; logic lives in `store.py` and the pure modules. Pure modules never import Django.
 - Error statuses follow the C2PA OpenAPI: invalid parameters and bodies are `400` (never `422`), unknown manifests
     are `404`, deleted ones `410`.
-- Uploaded bytes are untrusted: they reach c2pa-rs only through `manifest.read`, and nothing else parses them.
+- Uploaded bytes are untrusted: they reach c2pa-rs only through `manifest.read`, and nothing else parses them
+    (apart from the outer JUMBF box length that `manifest.check_length` compares with the upload length).
 - The store never fetches URLs from requests or manifests, and `manifest.context` keeps c2pa-rs off the network.
     Its only outbound HTTP is to the configured hub.
 - HTTP client is `httpx2` (with `httpcore2`), not `httpx`.

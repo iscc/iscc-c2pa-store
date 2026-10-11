@@ -194,6 +194,13 @@ def test_upload_tampered_manifest_is_400(client):
 
 
 @pytest.mark.django_db
+def test_upload_with_bytes_after_the_manifest_store_is_400(client):
+    body = assert_error(upload(client, C2PA_RS_MANIFEST + b"<html>anything</html>"), 400)
+    assert body["code"] == "manifest.trailingData"
+    assert not Manifest.objects.exists()
+
+
+@pytest.mark.django_db
 def test_upload_with_too_many_iscc_bindings_is_400(client):
     bindings = [("io.iscc.v0", encode(iscc_units(f"block {i}".encode() * 100))) for i in range(9)]
     body = assert_error(upload(client, sign_manifest(bindings)), 400)

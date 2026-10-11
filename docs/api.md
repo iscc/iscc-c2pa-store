@@ -182,8 +182,9 @@ searchable units. Equal scores rank manifests with a trusted signing credential 
 | `429`  | Rate limit of the client address exceeded; `Retry-After` says how long to wait                                                  |
 
 Error bodies are JSON with a `detail` member. A refused Manifest Store also carries `code`: the C2PA validation
-status code of the first failure, or `manifest.unreadable`, `manifest.missing`, `manifest.idInvalid`,
-`manifest.tooManyBindings` or `claimSignature.missing`. Unknown paths under `/v1/` and `/.well-known/` answer
+status code of the first failure, or `manifest.unreadable`, `manifest.trailingData`, `manifest.missing`,
+`manifest.idInvalid`, `manifest.tooManyBindings` or `claimSignature.missing`
+([Check](how-it-works.md#1-check)). Unknown paths under `/v1/` and `/.well-known/` answer
 `{"detail": "Not found"}`.
 
 ```json
