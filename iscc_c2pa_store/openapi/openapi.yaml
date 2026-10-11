@@ -1,7 +1,7 @@
 openapi: 3.1.1
 info:
   title: ISCC C2PA Store
-  version: 0.1.0
+  version: 0.1.1
   summary: C2PA Manifest Repository with a Soft Binding Resolution API and ISCC declarations
   description: |
     Stores C2PA Manifest Stores and finds them again by soft binding. Upload a Manifest Store; the store checks it

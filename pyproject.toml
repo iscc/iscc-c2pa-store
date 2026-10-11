@@ -1,6 +1,6 @@
 [project]
 name = "iscc-c2pa-store"
-version = "0.1.0"
+version = "0.1.1"
 description = "C2PA Manifest Repository with a Soft Binding Resolution API that declares ISCC soft bindings on the ISCC Discovery Protocol"
 authors = [{ name = "Titusz Pan", email = "tp@py7.de" }]
 readme = "README.md"
