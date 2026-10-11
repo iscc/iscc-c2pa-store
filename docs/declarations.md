@@ -63,7 +63,7 @@ store takes the first unit of each MainType, in the order Semantic-, Content-, D
   "datahash": "1e20a522af4a2c9cbf6a808924afd2acfa0793347b936678f5982e22fdd3dd4a0e37",
   "nonce": "0010dc860d4568c8ae7ac3e8ed3b2946",
   "timestamp": "2026-10-09T12:00:00.000Z",
-  "gateway": "https://c2pa-store-test.iscc.io/v1/manifests/urn%3Ac2pa%3AF9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4",
+  "gateway": "https://c2pa-store-test.iscc.io/v1/manifests/urn:c2pa:F9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4",
   "units": [
     "ISCC:EAD2RASIYU5IKLENP2OFI4CHZGRWYQCSW2WKX3Y6FJGOCXSYNYGLGBI",
     "ISCC:GADQLNA7GRZESMRF2J7NZPNWGI3II2ST5YUN5SS6GVQ2ZQGJXPPYDNI"
@@ -86,7 +86,7 @@ The example declares the Content-, Data- and Instance-Code of the API reference;
 | `datahash`  | `1e20` followed by the hex body of the Instance-Code                              |
 | `nonce`     | A fresh nonce whose first 12 bits name the hub of the declaration                 |
 | `timestamp` | Signing time, RFC 3339 UTC with milliseconds                                      |
-| `gateway`   | The manifest address, with the manifest ID percent-encoded                        |
+| `gateway`   | The manifest address                                                              |
 | `units`     | The declared units without the Instance-Code                                      |
 | `signature` | ISCC signature ([IEP-0019](https://ieps.iscc.codes/iep-0019/)) by the store's key |
 

@@ -328,7 +328,7 @@ def test_display_methods():
     assert manifest_admin.state(record) == "live"
     assert manifest_admin.declaration_status(record) == "pending"
     address = manifest_admin.address(record)
-    assert "https://store.example/v1/manifests/urn%3Ac2pa%3A%3Cx%3E" in address
+    assert "https://store.example/v1/manifests/urn:c2pa:%3Cx%3E" in address
     assert "<x>" not in address
 
 

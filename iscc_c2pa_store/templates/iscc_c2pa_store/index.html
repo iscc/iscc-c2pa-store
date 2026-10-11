@@ -210,7 +210,7 @@
             <figcaption>Answer · 200</figcaption>
 <pre><code>{
   <span class="t-key">"manifestId"</span>: <span class="t-str">"urn:c2pa:F9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4"</span>,
-  <span class="t-key">"manifestUrl"</span>: <span class="t-str">"{{ base_url }}/v1/manifests/urn%3Ac2pa%3AF9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4"</span>,
+  <span class="t-key">"manifestUrl"</span>: <span class="t-str">"{{ base_url }}/v1/manifests/urn:c2pa:F9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4"</span>,
   <span class="t-key">"declaration"</span>: {
 {% if declares %}    <span class="t-key">"status"</span>: <span class="t-str">"declared"</span>,
     <span class="t-key">"isccId"</span>: <span class="t-str">"ISCC:MAIGKV5FAAXOXYAB"</span>,
@@ -227,10 +227,10 @@
 
         <article class="recipe" aria-labelledby="r-fetch">
           <h3 id="r-fetch">Fetch by manifest ID</h3>
-          <p>Percent-encode the manifest ID. Unknown manifests answer 404, deleted ones 410.</p>
+          <p>The manifest ID goes into the path as it is; percent-encoded works too. Unknown manifests answer 404, deleted ones 410.</p>
           <figure class="code code--cmd">
             <figcaption>Request</figcaption>
-            <pre><code>curl -o manifest.c2pa "{{ base_url }}/v1/manifests/urn%3Ac2pa%3AF9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4"</code></pre>
+            <pre><code>curl -o manifest.c2pa "{{ base_url }}/v1/manifests/urn:c2pa:F9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4"</code></pre>
           </figure>
         </article>
 

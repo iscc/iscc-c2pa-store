@@ -401,7 +401,7 @@
         "name": "activeManifestId",
         "in": "path",
         "required": true,
-        "description": "Identifier of the active C2PA Manifest, percent-encoded",
+        "description": "Identifier of the active C2PA Manifest, percent-encoded; colons may stay unencoded",
         "schema": {
           "type": "string",
           "maxLength": 255,
@@ -559,7 +559,7 @@
                 "type": "string",
                 "description": "Extension. The manifest address on this repository, usable as ISCC gateway URL.",
                 "examples": [
-                  "https://c2pa-store-test.iscc.io/v1/manifests/urn%3Ac2pa%3AF9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4"
+                  "https://c2pa-store-test.iscc.io/v1/manifests/urn:c2pa:F9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4"
                 ]
               },
               "declaration": {

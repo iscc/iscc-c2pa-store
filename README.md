@@ -31,7 +31,7 @@ curl -X POST "https://c2pa-store-test.iscc.io/v1/manifests" \
 ```json
 {
   "manifestId": "urn:c2pa:F9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4",
-  "manifestUrl": "https://c2pa-store-test.iscc.io/v1/manifests/urn%3Ac2pa%3AF9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4",
+  "manifestUrl": "https://c2pa-store-test.iscc.io/v1/manifests/urn:c2pa:F9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4",
   "declaration": {
     "status": "declared",
     "isccId": "ISCC:MAIGKV5FAAXOXYAB",

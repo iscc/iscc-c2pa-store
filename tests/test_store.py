@@ -1403,7 +1403,7 @@ def test_uploader_key(settings):
 
 def test_manifest_url():
     label = "urn:c2pa:0b2c3d4e-0000-4000-8000-000000000000"
-    assert store.manifest_url(label) == f"https://store.example/v1/manifests/{label.replace(':', '%3A')}"
+    assert store.manifest_url(label) == f"https://store.example/v1/manifests/{label}"
     assert store.manifest_url("a/b c") == "https://store.example/v1/manifests/a%2Fb%20c"
 
 

@@ -54,8 +54,12 @@ def declarable_units(units):
 
 def gateway_url(base_url, manifest_id):
     # type: (str, str) -> str
-    """The manifest address, used as gateway URL: `<base>/v1/manifests/<percent-encoded manifest ID>`."""
-    return f"{base_url.rstrip('/')}/v1/manifests/{quote(manifest_id, safe='')}"
+    """The manifest address, used as gateway URL: `<base>/v1/manifests/<manifest ID>`.
+
+    Colons stay as they are, which a URL path allows (RFC 3986), so `urn:c2pa:...` IDs read cleanly; every other
+    character outside the unreserved set is percent-encoded, among them `/`, `?`, `#` and the `{` `}` of URI templates.
+    """
+    return f"{base_url.rstrip('/')}/v1/manifests/{quote(manifest_id, safe=':')}"
 
 
 def timestamp(now):

@@ -83,7 +83,7 @@ class StoreResult(ManifestCreateResultIdOnly):
         str,
         Field(
             description="Extension. The manifest address on this repository, usable as ISCC gateway URL.",
-            examples=["https://c2pa-store-test.iscc.io/v1/manifests/urn%3Ac2pa%3AF9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4"],
+            examples=["https://c2pa-store-test.iscc.io/v1/manifests/urn:c2pa:F9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4"],
         ),
     ]
     declaration: Declaration

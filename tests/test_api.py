@@ -95,10 +95,11 @@ def test_upload_result_without_declarations(client):
     assert manifest_id.startswith("urn:c2pa:")
     assert body == {
         "manifestId": manifest_id,
-        "manifestUrl": "https://store.example" + path(manifest_id),
+        "manifestUrl": f"https://store.example/v1/manifests/{manifest_id}",
         "declaration": {"status": "disabled"},
     }
-    assert "%3A" in body["manifestUrl"]
+    assert "%" not in body["manifestUrl"]
+    assert client.get(body["manifestUrl"].removeprefix("https://store.example")).content == data
     assert Manifest.objects.get(pk=manifest_id).sha256 == hashlib.sha256(data).hexdigest()
 
 

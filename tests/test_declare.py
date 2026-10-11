@@ -156,8 +156,14 @@ def test_declarable_units_build_an_iscc_code():
 @pytest.mark.parametrize(
     ("base", "manifest_id", "expected"),
     [
-        ("https://store.example", "urn:c2pa:1234", "https://store.example/v1/manifests/urn%3Ac2pa%3A1234"),
-        ("https://store.example/", "urn:c2pa:1234", "https://store.example/v1/manifests/urn%3Ac2pa%3A1234"),
+        ("https://store.example", "urn:c2pa:1234", "https://store.example/v1/manifests/urn:c2pa:1234"),
+        ("https://store.example/", "urn:c2pa:1234", "https://store.example/v1/manifests/urn:c2pa:1234"),
+        (
+            "https://store.example",
+            "contentauth:urn:uuid:b2b1f7fa-b119-4de1-9c0d-c97fbea3f2c3",
+            "https://store.example/v1/manifests/contentauth:urn:uuid:b2b1f7fa-b119-4de1-9c0d-c97fbea3f2c3",
+        ),
+        ("https://store.example", "urn:c2pa:x:gen@1:2_1", "https://store.example/v1/manifests/urn:c2pa:x:gen%401:2_1"),
         ("https://store.example/sub", "a b", "https://store.example/sub/v1/manifests/a%20b"),
         ("https://store.example", "a/b/../c", "https://store.example/v1/manifests/a%2Fb%2F..%2Fc"),
         ("https://store.example", "x?y#z", "https://store.example/v1/manifests/x%3Fy%23z"),

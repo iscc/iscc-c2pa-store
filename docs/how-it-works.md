@@ -105,10 +105,11 @@ the bindings, the ISCC-UNITs and the initial declaration state are written in on
 file is removed again. From then on the manifest address serves the bytes unchanged:
 
 ```text
-https://c2pa-store-test.iscc.io/v1/manifests/urn%3Ac2pa%3AF9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4
+https://c2pa-store-test.iscc.io/v1/manifests/urn:c2pa:F9168C5E-CEB2-4FAA-B6BF-329BF39FA1E4
 ```
 
-The manifest ID is percent-encoded in the address; the route accepts it encoded or not. An ID that is not
+The address keeps the colons of the manifest ID and percent-encodes any other character that a URL path reserves;
+the route accepts the ID encoded or not. An ID that is not
 printable or longer than 255 characters cannot be stored and answers `404`.
 
 ### 4. Declare
