@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "ISCC C2PA Store",
-    "version": "0.1.1",
+    "version": "0.2.0",
     "summary": "C2PA Manifest Repository with a Soft Binding Resolution API and ISCC declarations",
     "description": "Stores C2PA Manifest Stores and finds them again by soft binding. Upload a Manifest Store; the store checks it\nwith c2pa-rs, indexes every soft binding of its active manifest by algorithm, serves it unchanged at its\nmanifest address, and declares its `io.iscc.v0` soft binding on the ISCC Discovery Protocol with that address as\ngateway URL, so that anyone who finds the content through the ISCC network finds the manifest.\n\nImplements the store, fetch, query and service routes of the C2PA Soft Binding Resolution API as defined for\nthe upcoming C2PA specification 2.5, whose OpenAPI document still carries version 2.4.0. Schemas named `c2pa.*`\nare copied verbatim from the C2PA OpenAPI document (`c2pa-sbr.json`, CC BY 4.0).\n\nReads and uploads are open, limited per client address; deletes need the operator token of the deployment.\n\n**Experimental (beta, MVP).** This service and its documentation are provided as is, without warranty of any kind. The API, the declaration behaviour and the public instances may change in breaking ways before version 1.0.\n",
     "license": {
