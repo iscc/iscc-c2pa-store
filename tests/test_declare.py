@@ -102,8 +102,16 @@ def instance_from_datahash(datahash):
 
 
 def test_declarable_units_in_maintype_order():
-    given = units(INSTANCE, DATA_CODE, CONTENT, SEMANTIC_TEXT)
-    assert declarable_units(given) == [SEMANTIC_TEXT, CONTENT, DATA_CODE, INSTANCE]
+    given = units(INSTANCE, DATA_CODE, CONTENT, SEMANTIC_TEXT, META)
+    assert declarable_units(given) == [META, SEMANTIC_TEXT, CONTENT, DATA_CODE, INSTANCE]
+
+
+def test_declarable_units_meta_data_instance():
+    assert declarable_units(units(META, DATA_CODE, INSTANCE)) == [META, DATA_CODE, INSTANCE]
+
+
+def test_declarable_units_meta_code_alone_is_not_enough():
+    assert declarable_units(units(META, INSTANCE)) == []
 
 
 def test_declarable_units_data_and_instance_only():
@@ -149,6 +157,8 @@ def test_declarable_units_build_an_iscc_code():
         [DATA_CODE, INSTANCE],
         [SEMANTIC_IMAGE, CONTENT, DATA_CODE, INSTANCE],
         [SEMANTIC_TEXT, DATA_CODE, INSTANCE],
+        [META, DATA_CODE, INSTANCE],
+        [META, SEMANTIC_TEXT, CONTENT, DATA_CODE, INSTANCE],
     ):
         assert ic.gen_iscc_code(declarable_units(units(*given)))["iscc"].startswith("ISCC:K")
 
@@ -221,7 +231,14 @@ def test_build_note_datahash_is_the_instance_body():
 
 
 @pytest.mark.parametrize(
-    "declared", [[DATA_CODE, INSTANCE], [CONTENT, DATA_CODE, INSTANCE], [SEMANTIC_TEXT, CONTENT, DATA_CODE, INSTANCE]]
+    "declared",
+    [
+        [DATA_CODE, INSTANCE],
+        [CONTENT, DATA_CODE, INSTANCE],
+        [SEMANTIC_TEXT, CONTENT, DATA_CODE, INSTANCE],
+        [META, DATA_CODE, INSTANCE],
+        [META, SEMANTIC_TEXT, CONTENT, DATA_CODE, INSTANCE],
+    ],
 )
 def test_build_note_iscc_code_reconstructs_from_units_and_datahash(declared):
     note = build_note(declared, GATEWAY, KEYPAIR, 1, NOW)

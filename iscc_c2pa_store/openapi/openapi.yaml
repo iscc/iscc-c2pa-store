@@ -146,8 +146,8 @@ paths:
       summary: Find stored C2PA Manifests by soft binding
       description: |
         Exact match of the binding value for every indexed algorithm. For `io.iscc.v0` also by similarity: 100 for an
-        equal Instance-Code, otherwise the best Semantic-, Content- or Data-Code similarity, at most 99. Matches are
-        stored in this repository, so they carry no `endpoint`.
+        equal Instance-Code, otherwise the best Semantic-, Content- or Data-Code similarity (at most 99) or Meta-Code
+        similarity (at most 85). Matches are stored in this repository, so they carry no `endpoint`.
       operationId: queryByBinding
       parameters:
         - name: alg

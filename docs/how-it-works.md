@@ -86,9 +86,9 @@ The store reads every soft-binding assertion of the active manifest (`c2pa.soft-
 suffix) and keeps each block whose algorithm is on the
 [C2PA Soft Binding Algorithm List](https://github.com/c2pa-org/softbinding-algorithm-list) and whose value is at
 most 3072 bytes, as an exact-match entry. Values of `io.iscc.v0` blocks are also decoded, once each, as ISCC-SEQ
-([IEP-0020](https://ieps.iscc.codes/iep-0020/)) into searchable ISCC-UNITs: 256-bit Version 0 Semantic-,
-Content-, Data- and Instance-Codes. Meta-Codes, shorter units and units of a SubType the store does not know are
-not indexed, as IEP-0020 requires. An `io.iscc.v0` block without any searchable unit is not indexed at all, because
+([IEP-0020](https://ieps.iscc.codes/iep-0020/)) into searchable ISCC-UNITs: 256-bit Version 0 Meta-, Semantic-,
+Content-, Data- and Instance-Codes. Shorter units and units of a SubType the store does not know are not indexed, as
+IEP-0020 requires. An `io.iscc.v0` block without any searchable unit is not indexed at all, because
 a query with such a value is refused.
 
 Indexing has fixed limits per manifest. A Manifest Store with more than 64 such blocks, more than 8 of them
@@ -149,14 +149,15 @@ same API with `GET /v1/manifests/{manifestId}`.
 
 The store uses the same score rule as iscc-c2pa-resolver, so a manifest gets the same score in both.
 
-| Match                                                  | Score                                 |
-| ------------------------------------------------------ | ------------------------------------- |
-| Equal value for the queried algorithm                  | 100                                   |
-| Equal Instance-Code: the same bytes as the source      | 100                                   |
-| Otherwise, best Semantic-, Content- or Data-Code match | 100 × similarity, rounded, at most 99 |
-| Meta-Code                                              | never contributes                     |
+| Match                                                  | Score                                  |
+| ------------------------------------------------------ | -------------------------------------- |
+| Equal value for the queried algorithm                  | 100, or 85 if it holds only Meta-Codes |
+| Equal Instance-Code: the same bytes as the source      | 100                                    |
+| Otherwise, best Semantic-, Content- or Data-Code match | 100 × similarity, rounded, at most 99  |
+| or best Meta-Code match, if higher                     | 100 × similarity, rounded, at most 85  |
 
-Similarity is `1 - Hamming distance / 256`. A score is a shortlisting signal, not a verdict: similar ISCC-UNITs
+Similarity is `1 - Hamming distance / 256`. Meta-Codes stop at 85 because equal metadata, such as the same title, is
+weaker evidence than equal content: a close content match always ranks above a metadata-only match. A score is a shortlisting signal, not a verdict: similar ISCC-UNITs
 make a manifest a candidate, and the client confirms it, for example by comparing the claim thumbnail with the
 asset, and validates the manifest as usual.
 

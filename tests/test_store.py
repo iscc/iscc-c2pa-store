@@ -17,6 +17,7 @@ from datetime import UTC, datetime, timedelta
 
 import c2pa
 import httpx2
+import iscc_core as ic
 import iscc_crypto as icr
 import pytest
 from conftest import (
@@ -27,6 +28,7 @@ from conftest import (
     INSTANCE,
     JPEG,
     META,
+    META_64,
     SECKEY,
     VECTOR_1,
     FakeHub,
@@ -348,16 +350,18 @@ def test_ingest_deduplicates_iscc_units_and_drops_undecodable_values():
             ("io.iscc.v0", encode([CONTENT, DATA_CODE, INSTANCE])),
             ("io.iscc.v0", b64(b"junk")),
             ("io.iscc.v0", encode([META])),
+            ("io.iscc.v0", encode([META_64])),
         ]
     )
     record = ingest(data)
     assert sorted(bytes(b.value) for b in record.bindings.all()) == sorted(
-        [seq([DATA_CODE, INSTANCE]), seq([CONTENT, DATA_CODE, INSTANCE])]
+        [seq([DATA_CODE, INSTANCE]), seq([CONTENT, DATA_CODE, INSTANCE]), seq([META])]
     )
     assert sorted(record.units.values_list("unit_type", flat=True)) == [
         "CONTENT_TEXT_V0",
         "DATA_NONE_V0",
         "INSTANCE_NONE_V0",
+        "META_NONE_V0",
     ]
 
 
@@ -402,16 +406,16 @@ def distinct_units(count):
 
 def test_plan_index_keeps_registered_bounded_and_decodable_values():
     limit = binding.MAX_VALUE_BYTES
-    kept = [block(seq([DATA_CODE, INSTANCE])), block(b"\x07" * limit, TRUSTMARK, {"region": 1})]
+    kept = [block(seq([DATA_CODE, INSTANCE])), block(seq([META])), block(b"\x07" * limit, TRUSTMARK, {"region": 1})]
     dropped = [
         block(b"\x01", "com.example.unregistered"),
         block(b"\x07" * (limit + 1), TRUSTMARK),
         block(b"junk"),
-        block(seq([META])),
+        block(seq([META_64])),
     ]
-    index = store.plan_index((*dropped[:2], kept[0], *dropped[2:], kept[1]))
+    index = store.plan_index((*dropped[:2], kept[0], *dropped[2:], kept[1], kept[2]))
     assert index.bindings == kept
-    assert [u.iscc for u in index.units] == [DATA_CODE, INSTANCE]
+    assert [u.iscc for u in index.units] == [DATA_CODE, INSTANCE, META]
     assert index.declarable == index.units
 
 
@@ -419,8 +423,8 @@ def test_plan_index_deduplicates_units_of_iscc_blocks_only():
     blocks = (block(seq([DATA_CODE]), TRUSTMARK), block(seq([META, DATA_CODE, INSTANCE])), block(seq([INSTANCE])))
     index = store.plan_index(blocks)
     assert index.bindings == list(blocks)
-    assert [u.iscc for u in index.units] == [DATA_CODE, INSTANCE]
-    assert [u.iscc for u in index.declarable] == [DATA_CODE, INSTANCE]
+    assert [u.iscc for u in index.units] == [META, DATA_CODE, INSTANCE]
+    assert [u.iscc for u in index.declarable] == [META, DATA_CODE, INSTANCE]
 
 
 def test_plan_index_declares_only_units_of_whole_asset_blocks():
@@ -467,9 +471,10 @@ def test_plan_index_limits_distinct_units():
 
 
 def test_iscc_block_units():
-    assert [u.iscc for u in store.iscc_block_units(block(seq([META, DATA_CODE])))] == [DATA_CODE]
+    assert [u.iscc for u in store.iscc_block_units(block(seq([META, DATA_CODE])))] == [META, DATA_CODE]
     assert store.iscc_block_units(block(b"junk")) == []
-    assert store.iscc_block_units(block(seq([META]))) == []
+    assert [u.iscc for u in store.iscc_block_units(block(seq([META])))] == [META]
+    assert store.iscc_block_units(block(seq([META_64]))) == []
     assert store.iscc_block_units(block(b"")) == []
 
 
@@ -1133,7 +1138,7 @@ def test_query_invalid_iscc_value():
     with pytest.raises(ValueError):
         store.query("io.iscc.v0", b"junk", 10)
     with pytest.raises(ValueError):
-        store.query("io.iscc.v0", seq([META]), 10)
+        store.query("io.iscc.v0", seq([META_64]), 10)
 
 
 @pytest.mark.django_db
@@ -1193,9 +1198,60 @@ def test_query_best_unit_wins():
 
 
 @pytest.mark.django_db
-def test_query_meta_code_never_counts():
-    ingest(sign_manifest([("io.iscc.v0", VECTOR_1)]))
-    assert store.query("io.iscc.v0", seq([META, flip(DATA_CODE, 128)]), 10) == []
+@pytest.mark.parametrize(("bits", "score"), [(0, 85), (10, 85), (38, 85), (39, 85), (40, 84), (64, 75)])
+def test_query_meta_code_similarity_stops_at_85(bits, score):
+    record = ingest(sign_manifest([("io.iscc.v0", VECTOR_1)]))
+    found = store.query("io.iscc.v0", seq([flip(META, bits)]), 10)
+    assert [(m.manifest_id, m.score) for m in found] == [(record.manifest_id, score)]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("data_bits", "score"), [(128, 85), (64, 85), (26, 90), (0, 99)])
+def test_query_best_of_meta_and_content_wins(data_bits, score):
+    record = ingest(sign_manifest([("io.iscc.v0", VECTOR_1)]))
+    found = store.query("io.iscc.v0", seq([META, flip(DATA_CODE, data_bits)]), 10)
+    assert [(m.manifest_id, m.score) for m in found] == [(record.manifest_id, score)]
+
+
+@pytest.mark.django_db
+def test_query_content_match_outranks_meta_match():
+    meta_only = ingest(sign_manifest([("io.iscc.v0", encode([META]))]))
+    content = ingest(sign_manifest([("io.iscc.v0", encode([flip(DATA_CODE, 26)]))]))
+    found = store.query("io.iscc.v0", seq([META, DATA_CODE]), 10)
+    assert [(m.manifest_id, m.score) for m in found] == [(content.manifest_id, 90), (meta_only.manifest_id, 85)]
+
+
+@pytest.mark.django_db
+def test_query_meta_code_matches_only_meta_codes():
+    ingest(sign_manifest([("io.iscc.v0", encode([CONTENT, DATA_CODE, INSTANCE]))]))
+    assert store.query("io.iscc.v0", seq([META]), 10) == []
+
+
+@pytest.mark.django_db
+def test_query_equal_meta_only_value_stops_at_85():
+    record = ingest(sign_manifest([("io.iscc.v0", encode([META]))]))
+    found = store.query("io.iscc.v0", seq([META]), 10)
+    assert [(m.manifest_id, m.score) for m in found] == [(record.manifest_id, 85)]
+
+
+@pytest.mark.django_db
+def test_query_equal_value_with_short_units_beside_meta_stops_at_85():
+    content_64 = "ISCC:" + ic.encode_component(ic.MT.CONTENT, ic.ST_CC.TEXT, ic.VS.V0, 64, bytes(8))  # not searchable
+    record = ingest(sign_manifest([("io.iscc.v0", encode([META, content_64]))]))
+    found = store.query("io.iscc.v0", seq([META, content_64]), 10)
+    assert [(m.manifest_id, m.score) for m in found] == [(record.manifest_id, 85)]
+
+
+@pytest.mark.django_db
+def test_ingest_declares_meta_code_on_hub(hub):
+    units = [META, *iscc_units(b"declared with metadata" * 50)]
+    record = ingest(iscc_manifest(units))
+    declaration = Declaration.objects.get(pk=record.pk)
+    assert declaration.status == Status.DECLARED
+    assert declaration.units == units
+    note = hub.declared[declaration.iscc_id]
+    assert note["units"] == units[:2]
+    assert note["iscc_code"] == ic.gen_iscc_code(units)["iscc"]
 
 
 @pytest.mark.django_db

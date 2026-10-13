@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from conftest import CONTENT, DATA_CODE, flip
 
-from iscc_c2pa_store.similarity import BEST_SIMILAR, BITS, EQUAL, hamming_similarity, percent
+from iscc_c2pa_store.similarity import BEST_META, BEST_SIMILAR, BITS, EQUAL, hamming_similarity, percent
 
 
 def body(iscc):
@@ -24,7 +24,12 @@ def half_up(similarity):
 
 
 def test_constants():
-    assert (BITS, EQUAL, BEST_SIMILAR) == (256, 100, 99)
+    assert (BITS, EQUAL, BEST_SIMILAR, BEST_META) == (256, 100, 99, 85)
+
+
+@pytest.mark.parametrize(("similarity", "expected"), [(1.0, 85), (0.86, 85), (0.849, 85), (0.844, 84), (0.75, 75)])
+def test_percent_with_meta_ceiling(similarity, expected):
+    assert percent(similarity, BEST_META) == expected
 
 
 def test_hamming_similarity_of_identical_body_is_one():

@@ -1,8 +1,7 @@
 """Soft binding values: lenient base64 decoding for every algorithm, and ISCC-SEQ decoding for `io.iscc.v0`.
 
-An `io.iscc.v0` value is an ISCC-SEQ (IEP-0020). Only 256-bit Version 0 Semantic-, Content-, Data- and Instance-Codes
-are searchable: IEP-0020 requires resolvers to ignore shorter units, and equal metadata (Meta-Code) says nothing about
-equal content.
+An `io.iscc.v0` value is an ISCC-SEQ (IEP-0020). Only 256-bit Version 0 Meta-, Semantic-, Content-, Data- and
+Instance-Codes are searchable: IEP-0020 requires resolvers to ignore shorter units.
 """
 
 import base64
@@ -14,8 +13,8 @@ import iscc_core as ic
 ISCC_ALG = "io.iscc.v0"
 MAX_VALUE_LENGTH = 4096  # base64 characters of a query value, about 90 ISCC-UNITs of 256 bits
 MAX_VALUE_BYTES = MAX_VALUE_LENGTH * 3 // 4  # longest stored block value
-SEARCHABLE_TYPES = {ic.MT.SEMANTIC, ic.MT.CONTENT, ic.MT.DATA, ic.MT.INSTANCE}
-SIMILARITY_TYPES = {ic.MT.SEMANTIC, ic.MT.CONTENT, ic.MT.DATA}  # compared by Hamming distance; Instance by equality
+SEARCHABLE_TYPES = {ic.MT.META, ic.MT.SEMANTIC, ic.MT.CONTENT, ic.MT.DATA, ic.MT.INSTANCE}
+SIMILARITY_TYPES = {ic.MT.META, ic.MT.SEMANTIC, ic.MT.CONTENT, ic.MT.DATA}  # by Hamming distance; Instance by equality
 
 
 @dataclass(frozen=True)
@@ -57,7 +56,7 @@ def unit_type(maintype, subtype, version):
 
 def searchable(iscc):
     # type: (str) -> Unit | None
-    """Return the ISCC-UNIT as a searchable Unit, or None if it is not a 256-bit Version 0 S-, C-, D- or I-Code.
+    """Return the ISCC-UNIT as a searchable Unit, or None if it is not a 256-bit Version 0 M-, S-, C-, D- or I-Code.
 
     Units with a SubType unknown to iscc-core are ignored, as IEP-0020 requires, instead of failing.
     """
@@ -83,5 +82,5 @@ def decode_units(seq):
     units = [searchable(iscc) for iscc in dict.fromkeys(ic.decode_seq(seq))]
     found = [unit for unit in units if unit is not None]
     if not found:
-        raise ValueError("Value holds no 256-bit Version 0 Semantic-, Content-, Data- or Instance-Code")
+        raise ValueError("Value holds no 256-bit Version 0 Meta-, Semantic-, Content-, Data- or Instance-Code")
     return found

@@ -18,7 +18,7 @@ from conftest import (
     DATA_CODE,
     HUB_URL,
     INSTANCE,
-    META,
+    META_64,
     VECTOR_1,
     encode,
     flip,
@@ -779,7 +779,7 @@ def test_query_with_too_many_iscc_units_is_400(client, method):
         {"alg": "com.example.unknown", "value": "AAAA"},
         {"alg": "", "value": "AAAA"},
         {"alg": "io.iscc.v0", "value": "AAAA"},
-        {"alg": "io.iscc.v0", "value": encode([META])},
+        {"alg": "io.iscc.v0", "value": encode([META_64])},
     ],
 )
 def test_query_invalid_is_400(client, params):

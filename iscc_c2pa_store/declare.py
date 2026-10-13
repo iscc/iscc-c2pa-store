@@ -20,7 +20,7 @@ from iscc_c2pa_store.binding import Unit  # noqa: F401 (type comments)
 NOTE_SCHEMA = "http://purl.org/iscc/schema/iscc-note-0.8.0.json"
 DELETE_SCHEMA = "http://purl.org/iscc/schema/iscc-note-delete-0.8.0.json"
 BLAKE3_MULTIHASH = "1e20"  # multicodec blake3 (0x1e), digest length 32 (0x20)
-DECLARE_ORDER = (ic.MT.SEMANTIC, ic.MT.CONTENT, ic.MT.DATA, ic.MT.INSTANCE)
+DECLARE_ORDER = (ic.MT.META, ic.MT.SEMANTIC, ic.MT.CONTENT, ic.MT.DATA, ic.MT.INSTANCE)
 RETRYABLE = frozenset({408, 425, 429})  # client error statuses that mean "try again later"
 
 
@@ -36,7 +36,7 @@ class Outcome:
 
 def declarable_units(units):
     # type: (list[Unit]) -> list[str]
-    """Choose the units to declare: one per MainType in Semantic, Content, Data, Instance order.
+    """Choose the units to declare: one per MainType in Meta, Semantic, Content, Data, Instance order.
 
     Returns an empty list when a 256-bit Data-Code or Instance-Code is missing (IEP-0020 requires both). A
     Semantic-Code whose SubType differs from the Content-Code is left out, because an ISCC-CODE cannot combine them.

@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import httpx2
+import iscc_core as ic
 import iscc_crypto as icr
 from django.conf import settings
 from django.core.cache import cache
@@ -444,17 +445,24 @@ def query(alg, value, max_results):
     """
     if alg not in algorithms():
         raise ValueError(f"Unknown soft binding algorithm: {alg}")
+    units = binding.decode_units(value) if alg == binding.ISCC_ALG else []
+    if len(units) > MAX_UNITS:
+        raise ValueError(f"Value holds more than {MAX_UNITS} searchable ISCC units")
     scores = dict.fromkeys(
         Binding.objects.filter(alg=alg, value=value, manifest__deleted_at=None).values_list("manifest_id", flat=True),
-        similarity.EQUAL,
+        exact_score(units),
     )
-    if alg == binding.ISCC_ALG:
-        units = binding.decode_units(value)
-        if len(units) > MAX_UNITS:
-            raise ValueError(f"Value holds more than {MAX_UNITS} searchable ISCC units")
-        for manifest_id, score in iscc_scores(units).items():
-            scores[manifest_id] = max(score, scores.get(manifest_id, 0))
+    for manifest_id, score in iscc_scores(units).items():
+        scores[manifest_id] = max(score, scores.get(manifest_id, 0))
     return ranked(scores, min(max_results, MAX_RESULTS))
+
+
+def exact_score(units):
+    # type: (list[binding.Unit]) -> int
+    """Score of an equal binding value: 100, but at most BEST_META when its searchable units are all Meta-Codes."""
+    if units and all(unit.maintype == ic.MT.META for unit in units):
+        return similarity.BEST_META
+    return similarity.EQUAL
 
 
 def iscc_scores(units):
@@ -478,10 +486,14 @@ def iscc_scores(units):
 
 def unit_scores(unit, rows, bodies):
     # type: (binding.Unit, list[tuple[str, bytes]], list[bytes]) -> list[tuple[str, int]]
-    """Score stored units of one type against a query unit: by Hamming similarity, Instance-Codes by equality."""
+    """Score stored units of one type against a query unit: by Hamming similarity, Instance-Codes by equality.
+
+    Meta-Codes score at most BEST_META, the other similarity units at most BEST_SIMILAR.
+    """
     if unit.maintype in binding.SIMILARITY_TYPES:
+        ceiling = similarity.BEST_META if unit.maintype == ic.MT.META else similarity.BEST_SIMILAR
         values = similarity.hamming_similarity(unit.body, bodies)
-        return [(mid, similarity.percent(float(v))) for (mid, _), v in zip(rows, values, strict=True)]
+        return [(mid, similarity.percent(float(v), ceiling)) for (mid, _), v in zip(rows, values, strict=True)]
     return [(mid, similarity.EQUAL) for (mid, _), body in zip(rows, bodies, strict=True) if body == unit.body]
 
 

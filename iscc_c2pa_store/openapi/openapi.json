@@ -193,7 +193,7 @@
           "query"
         ],
         "summary": "Find stored C2PA Manifests by soft binding",
-        "description": "Exact match of the binding value for every indexed algorithm. For `io.iscc.v0` also by similarity: 100 for an\nequal Instance-Code, otherwise the best Semantic-, Content- or Data-Code similarity, at most 99. Matches are\nstored in this repository, so they carry no `endpoint`.\n",
+        "description": "Exact match of the binding value for every indexed algorithm. For `io.iscc.v0` also by similarity: 100 for an\nequal Instance-Code, otherwise the best Semantic-, Content- or Data-Code similarity (at most 99) or Meta-Code\nsimilarity (at most 85). Matches are stored in this repository, so they carry no `endpoint`.\n",
         "operationId": "queryByBinding",
         "parameters": [
           {

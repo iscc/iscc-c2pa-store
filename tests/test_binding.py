@@ -5,7 +5,7 @@ import base64
 import iscc_core as ic
 import iscc_core.codec
 import pytest
-from conftest import CONTENT, DATA_CODE, INSTANCE, META, VECTOR_1, encode, flip
+from conftest import CONTENT, DATA_CODE, INSTANCE, META, META_64, VECTOR_1, encode, flip
 
 from iscc_c2pa_store.binding import (
     MAX_VALUE_BYTES,
@@ -31,8 +31,8 @@ def isccs(units):
     return [unit.iscc for unit in units]
 
 
-def test_decode_vector_1_drops_meta_code():
-    assert isccs(decode_units(decode_base64(VECTOR_1))) == [CONTENT, DATA_CODE, INSTANCE]
+def test_decode_vector_1_keeps_every_unit():
+    assert isccs(decode_units(decode_base64(VECTOR_1))) == [META, CONTENT, DATA_CODE, INSTANCE]
 
 
 def test_encode_matches_reference_vector():
@@ -40,13 +40,14 @@ def test_encode_matches_reference_vector():
 
 
 def test_decoded_units_carry_type_and_body():
-    content, data, instance = decode_units(decode_base64(VECTOR_1))
+    meta, content, data, instance = decode_units(decode_base64(VECTOR_1))
     assert content == Unit(
         iscc=CONTENT, unit_type="CONTENT_TEXT_V0", maintype=ic.MT.CONTENT, body=ic.iscc_decode(CONTENT)[4]
     )
+    assert (meta.unit_type, meta.maintype) == ("META_NONE_V0", ic.MT.META)
     assert (data.unit_type, data.maintype) == ("DATA_NONE_V0", ic.MT.DATA)
     assert (instance.unit_type, instance.maintype) == ("INSTANCE_NONE_V0", ic.MT.INSTANCE)
-    assert all(len(unit.body) == 32 for unit in (content, data, instance))
+    assert all(len(unit.body) == 32 for unit in (meta, content, data, instance))
 
 
 @pytest.mark.parametrize(
@@ -154,9 +155,13 @@ def test_decode_units_rejects_unknown_subtype_unit_alone():
         decode_units(UNKNOWN_SUBTYPE)
 
 
-def test_decode_units_rejects_meta_code_only():
+def test_decode_units_accepts_meta_code_only():
+    assert isccs(decode_units(ic.encode_seq([META]))) == [META]
+
+
+def test_decode_units_rejects_short_meta_code_only():
     with pytest.raises(ValueError, match="256-bit"):
-        decode_units(ic.encode_seq([META]))
+        decode_units(ic.encode_seq([META_64]))
 
 
 def test_decode_units_normalizes_to_canonical_iscc():
@@ -179,7 +184,8 @@ DATA_V1 = ic.encode_header(ic.MT.DATA, ic.ST.NONE, ic.VS.V1, 7) + bytes(32)
         (DATA_CODE, "DATA_NONE_V0"),
         (INSTANCE, "INSTANCE_NONE_V0"),
         (SEMANTIC_IMAGE, "SEMANTIC_IMAGE_V0"),
-        (META, None),  # Meta-Codes say nothing about equal content
+        (META, "META_NONE_V0"),
+        (META_64, None),  # shorter than 256 bits
         (CONTENT_128, None),  # shorter than 256 bits
         ("ISCC:EAASKDNZNYGUUF5A", None),  # 64-bit Content-Code
         (FLAKE, None),  # not a content unit
@@ -201,6 +207,7 @@ def test_searchable_accepts_iscc_without_prefix():
 @pytest.mark.parametrize(
     ("maintype", "subtype", "version", "expected"),
     [
+        (ic.MT.META, ic.ST.NONE, ic.VS.V0, "META_NONE_V0"),
         (ic.MT.CONTENT, ic.ST_CC.IMAGE, ic.VS.V0, "CONTENT_IMAGE_V0"),
         (ic.MT.CONTENT, ic.ST_CC.MIXED, ic.VS.V0, "CONTENT_MIXED_V0"),
         (ic.MT.SEMANTIC, ic.ST_CC.TEXT, ic.VS.V0, "SEMANTIC_TEXT_V0"),
@@ -257,7 +264,7 @@ def test_decode_units_ignores_unknown_subtype_that_decodes(monkeypatch):
 @pytest.mark.parametrize(
     "iscc",
     [
-        "ISCC:" + ic.encode_component(ic.MT.META, ic.ST.NONE, ic.VS.V0, 256, bytes(32)),
+        "ISCC:" + ic.encode_component(ic.MT.FLAKE, ic.ST.NONE, ic.VS.V0, 256, bytes(32)),
         "ISCC:" + ic.encode_base32(DATA_V1),
         "ISCC:" + ic.encode_component(ic.MT.DATA, ic.ST.NONE, ic.VS.V0, 128, bytes(16)),
     ],

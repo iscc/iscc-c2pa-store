@@ -45,9 +45,9 @@ Declarations are enabled when the deployment has both a secret key (`ISCC_C2PA_S
 ## What gets declared
 
 The units come from the `io.iscc.v0` soft bindings of the active manifest that describe the whole asset, as the
-store indexed them (256-bit Version 0 units, Meta-Codes left out). A block with a `scope`, a region or time span of
+store indexed them (256-bit Version 0 units). A block with a `scope`, a region or time span of
 the asset, is searchable on the store but never declared, because a declaration stands for the whole content. The
-store takes the first unit of each MainType, in the order Semantic-, Content-, Data-, Instance-Code:
+store takes the first unit of each MainType, in the order Meta-, Semantic-, Content-, Data-, Instance-Code:
 
 - a 256-bit Data-Code and Instance-Code are required ([IEP-0020](https://ieps.iscc.codes/iep-0020/)); without
     them the declaration is `skipped`;
