@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Build stage: install the locked runtime dependencies and the package into a virtual environment, collect static files.
-FROM python:3.13-slim AS build
+FROM python:3.14-slim AS build
 COPY --from=ghcr.io/astral-sh/uv:0.12.23 /uv /bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_NO_CACHE=1 UV_PYTHON_DOWNLOADS=never DJANGO_STATIC_ROOT=/app/staticfiles
 WORKDIR /app
@@ -14,7 +14,7 @@ RUN uv sync --frozen --no-default-groups --no-editable \
     && DJANGO_SECRET_KEY=build ISCC_C2PA_STORE_URL=http://build .venv/bin/python manage.py collectstatic --noinput
 
 # Runtime stage: the virtual environment, static files and entrypoint, run by an unprivileged user.
-FROM python:3.13-slim
+FROM python:3.14-slim
 RUN useradd --system --uid 10001 --no-create-home store && mkdir /data && chown store /data
 COPY --from=build /app/.venv /app/.venv
 COPY --from=build /app/staticfiles /app/staticfiles
