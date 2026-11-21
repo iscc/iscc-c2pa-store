@@ -17,7 +17,7 @@ classifiers = [
     "Private :: Do Not Upload",
 ]
 dependencies = [
-    "c2pa-python>=0.38.0,<0.39",
+    "c2pa-python>=0.38.0,<0.40",
     "django>=6.1.2,<6.2",
     "dj-database-url>=3.1",
     "django-ninja>=1.7.1,<2",
@@ -156,7 +156,7 @@ all = { sequence = ["format", "typecheck", "test"], help = "Format, type check a
 ci = { sequence = ["lint", "typecheck", "test", "audit"], help = "Lint, type check, test and audit without modifying files (CI also runs the prek hooks)" }
 
 [tool.uv.sources]
-zensical-iscc = { git = "https://github.com/iscc/zensical-iscc", tag = "v0.2.0" }
+zensical-iscc = { git = "https://github.com/iscc/zensical-iscc", tag = "v0.3.2" }
 
 [tool.uv]
 default-groups = ["dev", "docs"]
